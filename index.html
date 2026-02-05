@@ -22,6 +22,14 @@
     .btn:hover { background: rgb(248 250 252); }
     .kpiVal { letter-spacing: -0.02em; }
     .activeNav { background: rgba(15,23,42,.08); border-color: rgba(15,23,42,.18); }
+    
+    /* Estilos para alertas */
+    .alert-high { border-left: 4px solid #ef4444; background-color: #fef2f2; }
+    .alert-medium { border-left: 4px solid #f59e0b; background-color: #fffbeb; }
+    .alert-low { border-left: 4px solid #3b82f6; background-color: #eff6ff; }
+    .alert-expanded { background-color: #f8fafc; }
+    .alert-details { max-height: 0; overflow: hidden; transition: max-height 0.3s ease-out; }
+    .alert-details.open { max-height: 500px; }
   </style>
 </head>
 
@@ -40,7 +48,7 @@
         <div class="w-10 h-10 rounded-2xl bg-slate-900 text-white flex items-center justify-center font-semibold">SC</div>
         <div>
           <div class="text-xl font-semibold text-slate-900">Portal • Operacional & RH</div>
-          <div class="text-xs muted">KPIs • Mix • Equip líderes por tipo • Comparação mês • Saúde por equipamento (todos)</div>
+          <div class="text-xs muted">KPIs • Mix • Equip líderes por tipo • Comparação mês • Saúde por equipamento (todos) • Alertas</div>
         </div>
       </div>
 
@@ -103,12 +111,17 @@
 
             <button class="navBtn btn w-full text-left px-3 py-2 rounded-xl bg-white" data-page="comparativo">
               <div class="text-sm font-semibold">Comparação mês</div>
-              <div class="text-xs muted">Mês A vs Mês B (delta)</div>
+              <div class="text-xs muted">Análise mensal por tipo de serviço</div>
             </button>
 
             <button class="navBtn btn w-full text-left px-3 py-2 rounded-xl bg-white" data-page="registros">
               <div class="text-sm font-semibold">Registros</div>
               <div class="text-xs muted">Tabela filtrada + drill</div>
+            </button>
+
+            <button class="navBtn btn w-full text-left px-3 py-2 rounded-xl bg-white" data-page="alertas">
+              <div class="text-sm font-semibold">Alertas</div>
+              <div class="text-xs muted">Clientes problemáticos + situações críticas</div>
             </button>
           </div>
 
@@ -182,12 +195,12 @@
 
           <div class="grid grid-cols-2 gap-2 mt-3">
             <div>
-              <label class="text-xs muted">Reinc. (dias)</label>
-              <input id="reincDias" type="number" min="1" value="14" class="mt-1 w-full px-3 py-2 rounded-xl border bg-white"/>
+              <label class="text-xs muted">Alerta: dias entre manutenções</label>
+              <input id="alertDias" type="number" min="1" value="30" class="mt-1 w-full px-3 py-2 rounded-xl border bg-white"/>
             </div>
             <div>
-              <label class="text-xs muted">Motivo similar (min tokens)</label>
-              <input id="reincWords" type="number" min="0" value="2" class="mt-1 w-full px-3 py-2 rounded-xl border bg-white"/>
+              <label class="text-xs muted">Min. manutenções</label>
+              <input id="alertMinManut" type="number" min="2" value="3" class="mt-1 w-full px-3 py-2 rounded-xl border bg-white"/>
             </div>
           </div>
 
@@ -266,38 +279,56 @@
         <div id="page-comparativo" class="hidden glass shadowSoft card rounded-2xl p-4">
           <div class="flex items-start justify-between flex-wrap gap-3">
             <div>
-              <div class="text-lg font-semibold">Comparação mês</div>
-              <div class="text-xs muted">Escolha Mês A e Mês B. Baseia no recorte atual (filtros).</div>
-            </div>
-
-            <div class="flex items-center gap-2 flex-wrap">
-              <select id="mA" class="btn px-3 py-2 rounded-xl bg-white text-sm"><option value="">(Mês A)</option></select>
-              <select id="mB" class="btn px-3 py-2 rounded-xl bg-white text-sm"><option value="">(Mês B)</option></select>
-              <button id="btnSwap" class="btn px-3 py-2 rounded-xl bg-white text-sm">Inverter</button>
+              <div class="text-lg font-semibold">Comparação mensal</div>
+              <div class="text-xs muted">Selecione os meses para comparar. Gráficos mostram apenas Montagem, Manutenção, Retirada, Troca e Revisão.</div>
             </div>
           </div>
 
-          <div id="momKpis" class="grid grid-cols-1 md:grid-cols-4 gap-3 mt-4"></div>
+          <!-- Seletor de meses -->
+          <div class="mt-4 card rounded-2xl p-3 bg-white">
+            <div class="text-sm font-semibold">Selecione os meses para comparar</div>
+            <div class="text-xs muted mt-1">Clique nos meses que deseja incluir na análise</div>
+            <div id="monthsCheckboxContainer" class="mt-3 flex flex-wrap gap-2"></div>
+          </div>
 
+          <!-- KPIs por mês -->
+          <div id="monthlyKPIs" class="mt-4"></div>
+
+          <!-- Gráficos -->
           <div class="grid grid-cols-1 lg:grid-cols-2 gap-3 mt-4">
             <div class="card rounded-2xl p-3 bg-white">
               <div class="flex items-center justify-between">
-                <div class="text-sm font-semibold">Chamados (A vs B)</div>
-                <div class="text-xs muted" id="momG1Meta">—</div>
+                <div class="text-sm font-semibold">Comparação por tipo de serviço</div>
+                <div class="text-xs muted" id="compareMeta1">—</div>
               </div>
-              <canvas id="momChart1" height="120"></canvas>
+              <canvas id="compareChart1" height="160"></canvas>
             </div>
 
             <div class="card rounded-2xl p-3 bg-white">
               <div class="flex items-center justify-between">
-                <div class="text-sm font-semibold">Top variação</div>
-                <div class="text-xs muted" id="momG2Meta">—</div>
+                <div class="text-sm font-semibold">Evolução mensal total</div>
+                <div class="text-xs muted" id="compareMeta2">—</div>
               </div>
-              <canvas id="momChart2" height="120"></canvas>
+              <canvas id="compareChart2" height="160"></canvas>
             </div>
           </div>
 
-          <div class="mt-4 card rounded-2xl p-3 bg-white" id="momTableWrap"></div>
+          <!-- Tabela comparativa -->
+          <div class="mt-4 card rounded-2xl p-3 bg-white">
+            <div class="text-sm font-semibold">Tabela comparativa detalhada</div>
+            <div class="text-xs muted">Valores por tipo de serviço em cada mês selecionado</div>
+            <div class="mt-3 overflow-auto border rounded-2xl">
+              <table class="min-w-full text-sm">
+                <thead class="bg-slate-100">
+                  <tr class="text-left">
+                    <th class="p-2">Tipo</th>
+                    <!-- Cabeçalhos serão preenchidos dinamicamente -->
+                  </tr>
+                </thead>
+                <tbody id="compareTableBody"></tbody>
+              </table>
+            </div>
+          </div>
         </div>
 
         <!-- PAGE: REGISTROS -->
@@ -341,6 +372,58 @@
             <div class="flex items-center gap-2">
               <button id="btnPrev" class="btn px-3 py-1.5 rounded-xl bg-white text-sm">Anterior</button>
               <button id="btnNext" class="btn px-3 py-1.5 rounded-xl bg-white text-sm">Próximo</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- PAGE: ALERTAS (NOVA) -->
+        <div id="page-alertas" class="hidden glass shadowSoft card rounded-2xl p-4">
+          <div class="flex items-center justify-between flex-wrap gap-2 mb-4">
+            <div>
+              <div class="text-lg font-semibold">Alertas - Situações Críticas</div>
+              <div class="text-xs muted">Clientes com múltiplas manutenções em pouco tempo. Clique para expandir detalhes.</div>
+            </div>
+            <div class="flex items-center gap-2">
+              <div class="chip rounded-xl px-3 py-2 bg-white text-xs">
+                <span class="muted">Período de alerta:</span> 
+                <span class="mono font-semibold" id="alertPeriodLabel">30 dias</span>
+              </div>
+              <button id="btnRefreshAlerts" class="btn px-3 py-1.5 rounded-xl bg-white text-sm">Atualizar alertas</button>
+            </div>
+          </div>
+
+          <!-- Resumo dos alertas -->
+          <div id="alertSummary" class="mb-4 grid grid-cols-1 md:grid-cols-4 gap-3">
+            <!-- Será preenchido dinamicamente -->
+          </div>
+
+          <!-- Lista de alertas -->
+          <div id="alertsContainer">
+            <div class="text-sm muted text-center p-4" id="noAlertsMessage">
+              Nenhum alerta encontrado. Ajuste os parâmetros ou carregue mais dados.
+            </div>
+            <!-- Alertas serão inseridos aqui -->
+          </div>
+
+          <!-- Legenda -->
+          <div class="mt-4 p-3 bg-white border rounded-xl">
+            <div class="text-sm font-semibold mb-2">Legenda dos alertas:</div>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-2 text-xs">
+              <div class="flex items-center gap-2">
+                <div class="w-3 h-3 rounded-full bg-red-500"></div>
+                <span><b>Alta criticidade:</b> 5+ manutenções em 30 dias</span>
+              </div>
+              <div class="flex items-center gap-2">
+                <div class="w-3 h-3 rounded-full bg-yellow-500"></div>
+                <span><b>Média criticidade:</b> 3-4 manutenções em 30 dias</span>
+              </div>
+              <div class="flex items-center gap-2">
+                <div class="w-3 h-3 rounded-full bg-blue-500"></div>
+                <span><b>Baixa criticidade:</b> Múltiplas manutenções (check padrão)</span>
+              </div>
+            </div>
+            <div class="mt-2 text-xs muted">
+              <b>Nota:</b> Alertas consideram apenas chamados do tipo "Manutenção" dentro do período configurado.
             </div>
           </div>
         </div>
@@ -477,9 +560,12 @@ let equipColumns = [];
 let filtered = [];
 let page = 1;
 let pageSize = 50;
+let healthSelectedCol = null;
+let selectedMonths = new Set();
+let alertsData = [];
 
 let chart1, chart2, chart3, chart4;
-let momChart1, momChart2;
+let compareChart1, compareChart2;
 let dChart;
 
 /* =========================
@@ -506,8 +592,8 @@ const fEquip   = el("fEquip");
 const fDe      = el("fDe");
 const fAte     = el("fAte");
 const fSearch  = el("fSearch");
-const reincDias= el("reincDias");
-const reincWords=el("reincWords");
+const alertDias = el("alertDias");
+const alertMinManut = el("alertMinManut");
 const healthWindowDays = el("healthWindowDays");
 
 const wrapCliente = el("wrapCliente");
@@ -533,12 +619,21 @@ const navBtns = document.querySelectorAll(".navBtn");
 const pages = {
   dashboard: el("page-dashboard"),
   comparativo: el("page-comparativo"),
-  registros: el("page-registros")
+  registros: el("page-registros"),
+  alertas: el("page-alertas")
 };
 
-const mA = el("mA"), mB = el("mB"), btnSwap = el("btnSwap");
-const momKpis = el("momKpis");
-const momTableWrap = el("momTableWrap");
+// Elementos da página de comparação
+const monthsCheckboxContainer = el("monthsCheckboxContainer");
+const monthlyKPIs = el("monthlyKPIs");
+const compareTableBody = el("compareTableBody");
+
+// Elementos da página de alertas
+const alertPeriodLabel = el("alertPeriodLabel");
+const btnRefreshAlerts = el("btnRefreshAlerts");
+const alertSummary = el("alertSummary");
+const alertsContainer = el("alertsContainer");
+const noAlertsMessage = el("noAlertsMessage");
 
 // Drill
 const drillModal = el("drillModal");
@@ -592,6 +687,7 @@ function normalizeRow(raw, sheetName){
   return {
     sheet: sheetName,
     base,
+    carro: safeStr(obj["carro"] || obj["Carro"] || ""),
     data: dataISO,
     month: monthKey(dataISO),
     chamado, cliente, tecnico, tipo, motivo,
@@ -632,6 +728,396 @@ function detectEquipColumns(records){
 }
 
 /* =========================
+   SISTEMA DE ALERTAS
+========================= */
+function detectAlerts() {
+  const daysWindow = Math.max(1, toInt(alertDias.value));
+  const minManut = Math.max(2, toInt(alertMinManut.value));
+  
+  alertPeriodLabel.textContent = `${daysWindow} dias`;
+  
+  // Filtrar apenas manutenções
+  const manutencaoRecords = filtered.filter(r => r.tipo === "Manutenção");
+  
+  if (manutencaoRecords.length === 0) {
+    alertsData = [];
+    return;
+  }
+  
+  // Agrupar por cliente
+  const byClient = new Map();
+  for (const r of manutencaoRecords) {
+    const key = r.cliente || "(vazio)";
+    if (!byClient.has(key)) byClient.set(key, []);
+    byClient.get(key).push(r);
+  }
+  
+  // Analisar cada cliente
+  const alerts = [];
+  
+  for (const [cliente, records] of byClient.entries()) {
+    if (records.length < minManut) continue;
+    
+    // Ordenar por data
+    const sorted = records.filter(r => r.data).sort((a, b) => a.data.localeCompare(b.data));
+    
+    if (sorted.length < minManut) continue;
+    
+    // Verificar se há manutenções próximas no tempo
+    let hasCloseManut = false;
+    let maxInWindow = 0;
+    let windowStart = null;
+    let problematicDates = [];
+    
+    for (let i = 0; i < sorted.length; i++) {
+      const current = sorted[i];
+      let countInWindow = 1;
+      const windowDates = [current.data];
+      
+      for (let j = i + 1; j < sorted.length; j++) {
+        const next = sorted[j];
+        const days = daysBetween(current.data, next.data);
+        if (days !== null && days <= daysWindow) {
+          countInWindow++;
+          windowDates.push(next.data);
+        } else {
+          break;
+        }
+      }
+      
+      if (countInWindow >= minManut) {
+        hasCloseManut = true;
+        if (countInWindow > maxInWindow) {
+          maxInWindow = countInWindow;
+          problematicDates = windowDates;
+          windowStart = current.data;
+        }
+      }
+    }
+    
+    if (hasCloseManut) {
+      // Calcular criticidade
+      let severity = "low";
+      if (maxInWindow >= 5) severity = "high";
+      else if (maxInWindow >= 3) severity = "medium";
+      
+      // Coletar equipamentos únicos
+      const equipamentos = new Set();
+      records.forEach(r => {
+        for (const col of equipColumns) {
+          const qty = toInt((r._raw||{})[col]);
+          if (qty > 0) equipamentos.add(col);
+        }
+      });
+      
+      // Coletar técnicos únicos
+      const tecnicos = new Set(records.map(r => r.tecnico).filter(Boolean));
+      
+      // Coletar motivos comuns
+      const motivos = new Map();
+      records.forEach(r => {
+        const motivo = r.motivo || "(sem motivo)";
+        motivos.set(motivo, (motivos.get(motivo) || 0) + 1);
+      });
+      const topMotivos = topN(motivos, 3);
+      
+      alerts.push({
+        cliente,
+        totalManut: records.length,
+        maxInWindow,
+        windowDays: daysWindow,
+        severity,
+        problematicDates,
+        windowStart,
+        equipamentos: Array.from(equipamentos),
+        tecnicos: Array.from(tecnicos),
+        topMotivos,
+        records: sorted // Manter os registros ordenados
+      });
+    }
+  }
+  
+  // Ordenar por criticidade (alta primeiro) e depois por quantidade
+  alerts.sort((a, b) => {
+    const severityOrder = { high: 3, medium: 2, low: 1 };
+    if (severityOrder[b.severity] !== severityOrder[a.severity]) {
+      return severityOrder[b.severity] - severityOrder[a.severity];
+    }
+    return b.maxInWindow - a.maxInWindow;
+  });
+  
+  alertsData = alerts;
+}
+
+function renderAlerts() {
+  detectAlerts();
+  
+  // Atualizar resumo
+  renderAlertSummary();
+  
+  // Limpar container
+  alertsContainer.innerHTML = '';
+  
+  if (alertsData.length === 0) {
+    noAlertsMessage.classList.remove('hidden');
+    return;
+  }
+  
+  noAlertsMessage.classList.add('hidden');
+  
+  // Renderizar cada alerta
+  alertsData.forEach((alert, index) => {
+    const alertElement = createAlertElement(alert, index);
+    alertsContainer.appendChild(alertElement);
+  });
+}
+
+function renderAlertSummary() {
+  const high = alertsData.filter(a => a.severity === 'high').length;
+  const medium = alertsData.filter(a => a.severity === 'medium').length;
+  const low = alertsData.filter(a => a.severity === 'low').length;
+  const total = alertsData.length;
+  
+  alertSummary.innerHTML = `
+    <div class="card rounded-2xl p-4 bg-white">
+      <div class="text-xs muted">Total de alertas</div>
+      <div class="text-2xl font-semibold mono">${total}</div>
+      <div class="text-xs muted">Clientes problemáticos</div>
+    </div>
+    
+    <div class="card rounded-2xl p-4 bg-white alert-high">
+      <div class="text-xs muted">Alta criticidade</div>
+      <div class="text-2xl font-semibold mono">${high}</div>
+      <div class="text-xs muted">5+ manutenções</div>
+    </div>
+    
+    <div class="card rounded-2xl p-4 bg-white alert-medium">
+      <div class="text-xs muted">Média criticidade</div>
+      <div class="text-2xl font-semibold mono">${medium}</div>
+      <div class="text-xs muted">3-4 manutenções</div>
+    </div>
+    
+    <div class="card rounded-2xl p-4 bg-white alert-low">
+      <div class="text-xs muted">Baixa criticidade</div>
+      <div class="text-2xl font-semibold mono">${low}</div>
+      <div class="text-xs muted">Múltiplas manutenções</div>
+    </div>
+  `;
+}
+
+function createAlertElement(alert, index) {
+  const alertDiv = document.createElement('div');
+  alertDiv.className = `mb-3 card rounded-2xl p-4 alert-${alert.severity}`;
+  alertDiv.id = `alert-${index}`;
+  
+  // Cabeçalho do alerta
+  const header = document.createElement('div');
+  header.className = 'flex items-start justify-between cursor-pointer';
+  header.addEventListener('click', () => toggleAlertDetails(index));
+  
+  const severityBadge = document.createElement('span');
+  severityBadge.className = 'px-2 py-1 rounded text-xs font-semibold';
+  
+  if (alert.severity === 'high') {
+    severityBadge.textContent = 'ALTA';
+    severityBadge.className += ' bg-red-100 text-red-800';
+  } else if (alert.severity === 'medium') {
+    severityBadge.textContent = 'MÉDIA';
+    severityBadge.className += ' bg-yellow-100 text-yellow-800';
+  } else {
+    severityBadge.textContent = 'BAIXA';
+    severityBadge.className += ' bg-blue-100 text-blue-800';
+  }
+  
+  header.innerHTML = `
+    <div class="flex-1">
+      <div class="flex items-center gap-2">
+        <div class="text-lg font-semibold">${escapeHtml(alert.cliente)}</div>
+        ${severityBadge.outerHTML}
+      </div>
+      <div class="text-xs muted mt-1">
+        ${alert.totalManut} manutenções no total • 
+        ${alert.maxInWindow} manutenções em ${alert.windowDays} dias •
+        Início: ${alert.windowStart || 'N/A'}
+      </div>
+    </div>
+    <div class="text-2xl mono font-semibold ml-2">${alert.maxInWindow}×</div>
+  `;
+  
+  alertDiv.appendChild(header);
+  
+  // Detalhes do alerta (inicialmente ocultos)
+  const details = document.createElement('div');
+  details.className = 'alert-details mt-3';
+  details.id = `alert-details-${index}`;
+  
+  // Estatísticas
+  const statsDiv = document.createElement('div');
+  statsDiv.className = 'grid grid-cols-1 md:grid-cols-3 gap-3 mb-3';
+  
+  statsDiv.innerHTML = `
+    <div class="bg-white p-3 rounded-xl border">
+      <div class="text-xs muted">Equipamentos</div>
+      <div class="text-sm mt-1">
+        ${alert.equipamentos.length > 0 
+          ? alert.equipamentos.map(e => `<div class="truncate">${escapeHtml(e)}</div>`).join('')
+          : '<div class="text-muted">Nenhum equipamento identificado</div>'}
+      </div>
+    </div>
+    
+    <div class="bg-white p-3 rounded-xl border">
+      <div class="text-xs muted">Técnicos envolvidos</div>
+      <div class="text-sm mt-1">
+        ${alert.tecnicos.length > 0 
+          ? alert.tecnicos.map(t => `<div>${escapeHtml(t)}</div>`).join('')
+          : '<div class="text-muted">Nenhum técnico identificado</div>'}
+      </div>
+    </div>
+    
+    <div class="bg-white p-3 rounded-xl border">
+      <div class="text-xs muted">Motivos mais comuns</div>
+      <div class="text-sm mt-1">
+        ${alert.topMotivos.length > 0 
+          ? alert.topMotivos.map(([motivo, count]) => `<div class="truncate">${escapeHtml(motivo)} (${count})</div>`).join('')
+          : '<div class="text-muted">Nenhum motivo registrado</div>'}
+      </div>
+    </div>
+  `;
+  
+  details.appendChild(statsDiv);
+  
+  // Tabela de registros
+  const tableTitle = document.createElement('div');
+  tableTitle.className = 'text-sm font-semibold mb-2';
+  tableTitle.textContent = 'Registros de manutenção (ordenados por data)';
+  details.appendChild(tableTitle);
+  
+  const tableContainer = document.createElement('div');
+  tableContainer.className = 'overflow-auto border rounded-xl';
+  
+  const table = document.createElement('table');
+  table.className = 'min-w-full text-sm';
+  
+  table.innerHTML = `
+    <thead class="bg-slate-100">
+      <tr class="text-left">
+        <th class="p-2">Data</th>
+        <th class="p-2">Chamado</th>
+        <th class="p-2">Técnico</th>
+        <th class="p-2">Acrésc.</th>
+        <th class="p-2">Motivo</th>
+        <th class="p-2">Equipamentos</th>
+      </tr>
+    </thead>
+    <tbody id="alert-table-${index}">
+      <!-- Linhas serão preenchidas abaixo -->
+    </tbody>
+  `;
+  
+  const tbody = table.querySelector(`#alert-table-${index}`);
+  
+  // Limitar a 20 registros para não ficar muito longo
+  const displayRecords = alert.records.slice(0, 20);
+  
+  displayRecords.forEach(record => {
+    // Identificar equipamentos nesta manutenção
+    const recordEquip = [];
+    for (const col of equipColumns) {
+      const qty = toInt((record._raw||{})[col]);
+      if (qty > 0) recordEquip.push(`${col} (${qty})`);
+    }
+    
+    const tr = document.createElement('tr');
+    tr.className = 'border-t hover:bg-slate-50';
+    
+    tr.innerHTML = `
+      <td class="p-2 mono">${record.data || ''}</td>
+      <td class="p-2 mono">${escapeHtml(record.chamado)}</td>
+      <td class="p-2">${escapeHtml(record.tecnico)}</td>
+      <td class="p-2 mono">${record.acrescimo || 0}</td>
+      <td class="p-2">${escapeHtml(record.motivo)}</td>
+      <td class="p-2 text-xs">${recordEquip.length > 0 ? recordEquip.join(', ') : '—'}</td>
+    `;
+    
+    tbody.appendChild(tr);
+  });
+  
+  // Adicionar mensagem se houver mais registros
+  if (alert.records.length > 20) {
+    const tr = document.createElement('tr');
+    tr.className = 'border-t bg-slate-50';
+    tr.innerHTML = `
+      <td class="p-2 text-center muted" colspan="6">
+        ... e mais ${alert.records.length - 20} registro(s)
+      </td>
+    `;
+    tbody.appendChild(tr);
+  }
+  
+  tableContainer.appendChild(table);
+  details.appendChild(tableContainer);
+  
+  // Ações
+  const actionsDiv = document.createElement('div');
+  actionsDiv.className = 'flex justify-between items-center mt-3 pt-3 border-t';
+  
+  const infoText = document.createElement('div');
+  infoText.className = 'text-xs muted';
+  infoText.textContent = 'Este cliente tem múltiplas manutenções em um período curto. Considere uma visita técnica mais abrangente.';
+  
+  const actionButtons = document.createElement('div');
+  actionButtons.className = 'flex gap-2';
+  
+  const filterBtn = document.createElement('button');
+  filterBtn.className = 'btn px-3 py-1.5 rounded-xl bg-white text-sm';
+  filterBtn.textContent = 'Filtrar este cliente';
+  filterBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    fCliente.value = alert.cliente;
+    applyFilters();
+    showPage('dashboard');
+  });
+  
+  const drillBtn = document.createElement('button');
+  drillBtn.className = 'btn px-3 py-1.5 rounded-xl bg-white text-sm';
+  drillBtn.textContent = 'Ver drill-down';
+  drillBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    openDrill('cliente', alert.cliente);
+  });
+  
+  actionButtons.appendChild(filterBtn);
+  actionButtons.appendChild(drillBtn);
+  
+  actionsDiv.appendChild(infoText);
+  actionsDiv.appendChild(actionButtons);
+  details.appendChild(actionsDiv);
+  
+  alertDiv.appendChild(details);
+  
+  return alertDiv;
+}
+
+function toggleAlertDetails(index) {
+  const details = el(`alert-details-${index}`);
+  const alertDiv = el(`alert-${index}`);
+  
+  if (details.classList.contains('open')) {
+    details.classList.remove('open');
+    alertDiv.classList.remove('alert-expanded');
+  } else {
+    // Fechar outros alertas abertos
+    document.querySelectorAll('.alert-details.open').forEach(el => {
+      el.classList.remove('open');
+      el.closest('.card').classList.remove('alert-expanded');
+    });
+    
+    details.classList.add('open');
+    alertDiv.classList.add('alert-expanded');
+  }
+}
+
+/* =========================
    UI por módulo
 ========================= */
 function applyModuleUI(){
@@ -648,13 +1134,11 @@ function applyModuleUI(){
 ========================= */
 function applyFilters(){
   const mod = moduleSel.value;
-
   const base = fBase.value.trim();
   const c = (mod==="rh") ? "" : fCliente.value.trim();
   const t = fTecnico.value.trim();
   const tp= fTipo.value.trim();
   const eq= (mod==="rh") ? "" : fEquip.value.trim();
-
   const de= fDe.value ? fDe.value : "";
   const ate= fAte.value ? fAte.value : "";
   const s = fSearch.value.trim().toLowerCase();
@@ -681,16 +1165,261 @@ function applyFilters(){
   });
 
   page = 1;
-  fillMonthsFromFiltered();
+  fillMonthsCheckboxes();
   renderAll();
 }
 
 /* =========================
-   KPIs + INSIGHTS (sem SLA no operacional)
+   COMPARAÇÃO MENSAL
+========================= */
+function fillMonthsCheckboxes() {
+  const months = monthsAvailableFromFiltered();
+  monthsCheckboxContainer.innerHTML = '';
+  
+  if (months.length === 0) {
+    monthsCheckboxContainer.innerHTML = '<div class="text-sm muted p-3">Nenhum mês disponível com os filtros atuais</div>';
+    return;
+  }
+  
+  months.forEach(month => {
+    const checkboxId = `month-${month}`;
+    const div = document.createElement('div');
+    div.className = 'flex items-center gap-2';
+    div.innerHTML = `
+      <input type="checkbox" id="${checkboxId}" value="${month}" class="rounded border-slate-300">
+      <label for="${checkboxId}" class="text-sm cursor-pointer">${month}</label>
+    `;
+    
+    const checkbox = div.querySelector('input');
+    checkbox.checked = selectedMonths.has(month);
+    checkbox.addEventListener('change', (e) => {
+      if (e.target.checked) {
+        selectedMonths.add(month);
+      } else {
+        selectedMonths.delete(month);
+      }
+      renderMonthlyComparison();
+    });
+    
+    monthsCheckboxContainer.appendChild(div);
+  });
+}
+
+function monthsAvailableFromFiltered() {
+  return uniqSorted(filtered.map(r => r.month).filter(Boolean));
+}
+
+function renderMonthlyComparison() {
+  const months = Array.from(selectedMonths).sort();
+  
+  if (months.length === 0) {
+    monthlyKPIs.innerHTML = '<div class="text-sm muted p-3">Selecione pelo menos um mês para visualizar a comparação</div>';
+    destroyIfExists(compareChart1);
+    destroyIfExists(compareChart2);
+    compareTableBody.innerHTML = '';
+    return;
+  }
+  
+  // Dados por mês
+  const monthlyData = months.map(month => {
+    const monthRecords = filtered.filter(r => r.month === month && VALID_TIPOS.includes(r.tipo));
+    
+    // Contagem por tipo
+    const counts = {};
+    VALID_TIPOS.forEach(tipo => {
+      counts[tipo] = monthRecords.filter(r => r.tipo === tipo).length;
+    });
+    
+    // Total válido (apenas tipos válidos)
+    const totalValid = monthRecords.length;
+    
+    // Acréscimos
+    const acrescimos = monthRecords.reduce((sum, r) => sum + (r.acrescimo || 0), 0);
+    
+    return {
+      month,
+      counts,
+      totalValid,
+      acrescimos
+    };
+  });
+  
+  // Render KPIs por mês
+  renderMonthlyKPIs(monthlyData);
+  
+  // Render gráficos
+  renderComparisonCharts(monthlyData);
+  
+  // Render tabela comparativa
+  renderComparisonTable(monthlyData);
+}
+
+function renderMonthlyKPIs(monthlyData) {
+  monthlyKPIs.innerHTML = '';
+  
+  const container = document.createElement('div');
+  container.className = 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3';
+  
+  monthlyData.forEach(data => {
+    const div = document.createElement('div');
+    div.className = 'card rounded-2xl p-4 bg-white';
+    div.innerHTML = `
+      <div class="text-sm font-semibold">${data.month}</div>
+      <div class="mt-2 space-y-1 text-sm">
+        <div class="flex justify-between">
+          <span class="muted">Total:</span>
+          <span class="mono font-semibold">${data.totalValid}</span>
+        </div>
+        <div class="flex justify-between">
+          <span class="muted">Acréscimos:</span>
+          <span class="mono font-semibold">${data.acrescimos}</span>
+        </div>
+        ${VALID_TIPOS.map(tipo => `
+          <div class="flex justify-between">
+            <span class="muted">${tipo}:</span>
+            <span class="mono">${data.counts[tipo]}</span>
+          </div>
+        `).join('')}
+      </div>
+    `;
+    container.appendChild(div);
+  });
+  
+  monthlyKPIs.appendChild(container);
+}
+
+function renderComparisonCharts(monthlyData) {
+  const months = monthlyData.map(d => d.month);
+  
+  // Gráfico 1: Comparação por tipo (agrupado)
+  const datasets1 = VALID_TIPOS.map((tipo, idx) => {
+    const colors = ['#4f46e5', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'];
+    return {
+      label: tipo,
+      data: monthlyData.map(d => d.counts[tipo]),
+      backgroundColor: colors[idx % colors.length],
+      borderColor: colors[idx % colors.length],
+      borderWidth: 1
+    };
+  });
+  
+  destroyIfExists(compareChart1);
+  compareChart1 = new Chart(el("compareChart1"), {
+    type: 'bar',
+    data: {
+      labels: months,
+      datasets: datasets1
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        legend: {
+          display: true,
+          position: 'bottom'
+        }
+      },
+      scales: {
+        y: {
+          beginAtZero: true,
+          ticks: { precision: 0 }
+        }
+      }
+    }
+  });
+  el("compareMeta1").textContent = `${months.length} mês(es) selecionado(s)`;
+  
+  // Gráfico 2: Evolução total mensal (linha)
+  const totalData = monthlyData.map(d => d.totalValid);
+  
+  destroyIfExists(compareChart2);
+  compareChart2 = new Chart(el("compareChart2"), {
+    type: 'line',
+    data: {
+      labels: months,
+      datasets: [{
+        label: 'Total de serviços',
+        data: totalData,
+        backgroundColor: 'rgba(59, 130, 246, 0.1)',
+        borderColor: '#3b82f6',
+        borderWidth: 2,
+        tension: 0.3,
+        fill: true
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        legend: {
+          display: true,
+          position: 'bottom'
+        }
+      },
+      scales: {
+        y: {
+          beginAtZero: true,
+          ticks: { precision: 0 }
+        }
+      }
+    }
+  });
+  el("compareMeta2").textContent = `${months.length} mês(es) selecionado(s)`;
+}
+
+function renderComparisonTable(monthlyData) {
+  const months = monthlyData.map(d => d.month);
+  
+  // Cabeçalho
+  const thead = document.querySelector('#compareTableBody').closest('table').querySelector('thead tr');
+  thead.innerHTML = '<th class="p-2">Tipo</th>';
+  months.forEach(month => {
+    thead.innerHTML += `<th class="p-2">${month}</th>`;
+  });
+  thead.innerHTML += '<th class="p-2">Total</th>';
+  
+  // Corpo da tabela
+  let tableHTML = '';
+  
+  // Linhas para cada tipo
+  VALID_TIPOS.forEach(tipo => {
+    const rowData = months.map(month => {
+      const data = monthlyData.find(d => d.month === month);
+      return data.counts[tipo] || 0;
+    });
+    const total = rowData.reduce((sum, val) => sum + val, 0);
+    
+    tableHTML += `
+      <tr class="border-t hover:bg-slate-50">
+        <td class="p-2 font-medium">${tipo}</td>
+        ${rowData.map(val => `<td class="p-2 mono text-center">${val}</td>`).join('')}
+        <td class="p-2 mono font-semibold text-center">${total}</td>
+      </tr>
+    `;
+  });
+  
+  // Linha de total
+  const totals = months.map(month => {
+    const data = monthlyData.find(d => d.month === month);
+    return data.totalValid;
+  });
+  const grandTotal = totals.reduce((sum, val) => sum + val, 0);
+  
+  tableHTML += `
+    <tr class="border-t bg-slate-50">
+      <td class="p-2 font-semibold">TOTAL</td>
+      ${totals.map(val => `<td class="p-2 mono font-semibold text-center">${val}</td>`).join('')}
+      <td class="p-2 mono font-semibold text-center">${grandTotal}</td>
+    </tr>
+  `;
+  
+  compareTableBody.innerHTML = tableHTML;
+}
+
+/* =========================
+   KPIs + INSIGHTS
 ========================= */
 function calcReinc(records){
-  const win = Math.max(1, toInt(reincDias.value));
-  const minCommon = Math.max(0, toInt(reincWords.value));
+  const win = Math.max(1, toInt(alertDias.value));
+  const minCommon = Math.max(0, toInt(alertMinManut.value));
 
   const byClient = new Map();
   for (const r of records){
@@ -803,8 +1532,19 @@ function renderKPIs(){
     const mix = groupCount(filtered.filter(r=>VALID_TIPOS.includes(r.tipo)), r=>r.tipo);
     const topTipo = topN(mix, 1)[0] ? `${topN(mix,1)[0][0]} (${topN(mix,1)[0][1]})` : "—";
 
+    const daySet = new Set(filtered.map(r=>r.data).filter(Boolean));
+    const carSet = new Set(filtered.map(r=>r.carro).filter(Boolean));
+    const daysWithData = daySet.size || 0;
+    const cars = carSet.size || 0;
+
+    const avgPerDay = daysWithData ? (total / daysWithData) : null;
+    const avgPerDayPerCar = (daysWithData && cars) ? (total / (daysWithData * cars)) : null;
+    const estMonth = avgPerDay ? (avgPerDay * 30.42) : null;
+
     cards.push({t:"Chamados", v: total, s:"no recorte"});
     cards.push({t:"Maior fatia", v: topTipo, s:"mix de tipo"});
+    cards.push({t:"Média (dia / carro)", v: (avgPerDayPerCar===null?"—":avgPerDayPerCar.toFixed(2)), s: `${daysWithData||"—"} dia(s) • ${cars||"—"} carro(s)`});
+    cards.push({t:"Média (cham./mês)", v: (estMonth===null?"—":estMonth.toFixed(0)), s:"estimativa via média/dia"});
     cards.push({t:"Acréscimos", v: acresc, s:"soma do recorte"});
     cards.push({t:"Equip (qty)", v: equipS, s:"soma nas colunas detectadas"});
   } else {
@@ -858,7 +1598,6 @@ function renderDominantEquip(){
     return;
   }
 
-  // recorte atual ignorando fTipo (pra responder “maior fatia foi X”)
   const baseFilteredNoTipo = rawRecords.filter(r=>{
     const base = fBase.value.trim();
     const c = fCliente.value.trim();
@@ -902,7 +1641,7 @@ function renderDominantEquip(){
   opDominantEquip.innerHTML = `
     <div class="flex items-start justify-between flex-wrap gap-2">
       <div>
-        <div class="text-lg font-semibold">Pergunta de reunião: “A maior fatia foi ${escapeHtml(dominantTipo)}. Qual equipamento liderou?”</div>
+        <div class="text-lg font-semibold">Pergunta de reunião: "A maior fatia foi ${escapeHtml(dominantTipo)}. Qual equipamento liderou?"</div>
         <div class="text-xs muted">Ranking por qty nas colunas de equipamento (no recorte atual, ignorando o filtro de tipo).</div>
       </div>
       <div class="chip rounded-xl px-3 py-2 bg-slate-50 text-xs">
@@ -932,87 +1671,8 @@ function renderDominantEquip(){
 }
 
 /* =========================
-   SAÚDE POR EQUIPAMENTO (TODOS)
-   - Selector de coluna (qualquer equipamento)
-   - Top por Manutenção (qty)
-   - Gap médio entre manutenções (proxy)
-   - Casos Montagem -> Manutenção em X dias (entrega=montagem)
+   SAÚDE POR EQUIPAMENTO
 ========================= */
-function maintenanceIntervalStats(records, equipCol){
-  const groups = new Map(); // cliente -> dates
-  for (const r of records){
-    if (!r.data) continue;
-    if (r.tipo !== "Manutenção") continue;
-    const qty = toInt((r._raw||{})[equipCol]);
-    if (!(qty > 0)) continue;
-    const key = r.cliente || "(vazio)";
-    if (!groups.has(key)) groups.set(key, []);
-    groups.get(key).push(r.data);
-  }
-
-  const out = [];
-  for (const [cliente, dates] of groups.entries()){
-    dates.sort();
-    if (dates.length < 2){
-      out.push({cliente, n: dates.length, avgGap: null, last: dates[dates.length-1] || null});
-      continue;
-    }
-    const gaps = [];
-    for (let i=1;i<dates.length;i++){
-      gaps.push(daysBetween(dates[i-1], dates[i]));
-    }
-    const avgGap = Math.round(gaps.reduce((a,b)=>a+b,0)/gaps.length);
-    out.push({cliente, n: dates.length, avgGap, last: dates[dates.length-1]});
-  }
-
-  out.sort((a,b)=> (b.n - a.n));
-  return out;
-}
-
-function postDeliveryMaintenance(records, equipCol, windowDays=14){
-  // Manutenção até X dias após Montagem (entrega=montagem)
-  const byKey = new Map(); // base||cliente||equip -> {montagens:[], manut:[]}
-  const keyFn = (r)=> `${r.base||""}||${r.cliente||"(vazio)"}||${equipCol}`;
-
-  for (const r of records){
-    if (!r.data) continue;
-    const qty = toInt((r._raw||{})[equipCol]);
-    if (!(qty > 0)) continue;
-    if (r.tipo !== "Montagem" && r.tipo !== "Manutenção") continue;
-
-    const k = keyFn(r);
-    if (!byKey.has(k)) byKey.set(k, {cliente:r.cliente||"(vazio)", base:r.base||"", montagens:[], manut:[]});
-    if (r.tipo === "Montagem") byKey.get(k).montagens.push(r.data);
-    if (r.tipo === "Manutenção") byKey.get(k).manut.push(r.data);
-  }
-
-  const flagged = [];
-  for (const obj of byKey.values()){
-    obj.montagens.sort();
-    obj.manut.sort();
-    if (!obj.montagens.length || !obj.manut.length) continue;
-
-    let j=0;
-    for (const mDate of obj.montagens){
-      while (j < obj.manut.length && obj.manut[j] < mDate) j++;
-      if (j >= obj.manut.length) break;
-      const delta = daysBetween(mDate, obj.manut[j]);
-      if (delta !== null && delta >= 0 && delta <= windowDays){
-        flagged.push({
-          base: obj.base,
-          cliente: obj.cliente,
-          equip: equipCol,
-          montagem: mDate,
-          manutencao: obj.manut[j],
-          deltaDays: delta
-        });
-      }
-    }
-  }
-  flagged.sort((a,b)=>a.deltaDays - b.deltaDays);
-  return flagged;
-}
-
 function renderEquipHealth(){
   const mod = moduleSel.value;
   if (mod !== "operacoes"){
@@ -1030,13 +1690,12 @@ function renderEquipHealth(){
     return;
   }
 
-  const selected = window.__healthSelectedCol && equipColumns.includes(window.__healthSelectedCol)
-    ? window.__healthSelectedCol
+  const selected = healthSelectedCol && equipColumns.includes(healthSelectedCol)
+    ? healthSelectedCol
     : equipColumns[0];
 
   const win = Math.max(1, toInt(healthWindowDays.value));
 
-  // base para cálculo: recorte atual mas IGNORA fTipo (precisa ver montagem+manutenção)
   const baseRec = rawRecords.filter(r=>{
     const base = fBase.value.trim();
     const c = fCliente.value.trim();
@@ -1062,7 +1721,6 @@ function renderEquipHealth(){
     return true;
   });
 
-  // Top equipamentos por manutenção (qty)
   const maintMap = new Map();
   for (const col of equipColumns){
     let qty = 0;
@@ -1074,10 +1732,8 @@ function renderEquipHealth(){
   }
   const topMaint = topN(maintMap, 10);
 
-  // selecionado
   const maintTotal = maintMap.get(selected) || 0;
 
-  // Montagens qty do selecionado
   let montCount = 0;
   for (const r of baseRec){
     if (r.tipo !== "Montagem") continue;
@@ -1089,7 +1745,6 @@ function renderEquipHealth(){
   const flaggedCount = flagged.length;
   const pct = montCount ? Math.round((flaggedCount / montCount) * 100) : 0;
 
-  // Gap médio global entre manutenções (proxy)
   const allMaintDates = [];
   for (const r of baseRec){
     if (!r.data) continue;
@@ -1113,7 +1768,7 @@ function renderEquipHealth(){
       <div>
         <div class="text-lg font-semibold">Saúde por equipamento (todos)</div>
         <div class="text-xs muted">
-          Responde: “qual equipamento está dando manutenção com mais frequência?”, “quanto tempo entre falhas (proxy)?”, “entrega virou manutenção rápido?”.
+          Responde: "qual equipamento está dando manutenção com mais frequência?", "quanto tempo entre falhas (proxy)?", "entrega virou manutenção rápido?".
         </div>
       </div>
       <div class="flex items-center gap-2 flex-wrap">
@@ -1137,7 +1792,7 @@ function renderEquipHealth(){
         <div class="text-xs muted">Pós-montagem (até ${win}d)</div>
         <div class="text-2xl font-semibold mono">${flaggedCount}</div>
       </div>
-      <div class="card rounded-2xl p-3 bg-slate-50">
+      <div class="card rounded-xl p-3 bg-slate-50">
         <div class="text-xs muted">% pós-montagem</div>
         <div class="text-2xl font-semibold mono">${montCount?`${pct}%`:"—"}</div>
       </div>
@@ -1195,15 +1850,58 @@ function renderEquipHealth(){
     </div>
 
     <div class="mt-3 text-xs muted">
-      Nota técnica: isso é um <b>proxy</b> (mesmo cliente + mesma coluna/modelo). Para “mesmo equipamento físico”, precisa de patrimônio/serial no XLSX.
+      Nota técnica: isso é um <b>proxy</b> (mesmo cliente + mesma coluna/modelo). Para "mesmo equipamento físico", precisa de patrimônio/serial no XLSX.
     </div>
   `;
 
   const sel = el("healthEquipSel");
   sel.addEventListener("change", ()=>{
-    window.__healthSelectedCol = sel.value;
+    healthSelectedCol = sel.value;
     renderEquipHealth();
   });
+}
+
+function postDeliveryMaintenance(records, equipCol, windowDays=14){
+  const byKey = new Map();
+  const keyFn = (r)=> `${r.base||""}||${r.cliente||"(vazio)"}||${equipCol}`;
+
+  for (const r of records){
+    if (!r.data) continue;
+    const qty = toInt((r._raw||{})[equipCol]);
+    if (!(qty > 0)) continue;
+    if (r.tipo !== "Montagem" && r.tipo !== "Manutenção") continue;
+
+    const k = keyFn(r);
+    if (!byKey.has(k)) byKey.set(k, {cliente:r.cliente||"(vazio)", base:r.base||"", montagens:[], manut:[]});
+    if (r.tipo === "Montagem") byKey.get(k).montagens.push(r.data);
+    if (r.tipo === "Manutenção") byKey.get(k).manut.push(r.data);
+  }
+
+  const flagged = [];
+  for (const obj of byKey.values()){
+    obj.montagens.sort();
+    obj.manut.sort();
+    if (!obj.montagens.length || !obj.manut.length) continue;
+
+    let j=0;
+    for (const mDate of obj.montagens){
+      while (j < obj.manut.length && obj.manut[j] < mDate) j++;
+      if (j >= obj.manut.length) break;
+      const delta = daysBetween(mDate, obj.manut[j]);
+      if (delta !== null && delta >= 0 && delta <= windowDays){
+        flagged.push({
+          base: obj.base,
+          cliente: obj.cliente,
+          equip: equipCol,
+          montagem: mDate,
+          manutencao: obj.manut[j],
+          deltaDays: delta
+        });
+      }
+    }
+  }
+  flagged.sort((a,b)=>a.deltaDays - b.deltaDays);
+  return flagged;
 }
 
 /* =========================
@@ -1245,7 +1943,27 @@ function buildCharts(){
       labels: mixEntries.map(([k])=>k),
       datasets:[{ label:"Mix", data: mixEntries.map(([,v])=>v) }]
     },
-    options:{ responsive:true, plugins:{legend:{display:true, position:"bottom"}} }
+    options:{
+      responsive:true,
+      plugins:{
+        legend:{
+          display:true,
+          position:"bottom",
+          onClick: (e, item, legend)=>{
+            const chart = legend.chart;
+            chart.toggleDataVisibility(item.index);
+            chart.update();
+
+            const ds = chart.data.datasets[0];
+            let visTotal = 0;
+            for (let i=0;i<ds.data.length;i++){
+              if (chart.getDataVisibility(i)) visTotal += Number(ds.data[i]||0);
+            }
+            el("g2meta").textContent = `${visTotal} chamados`;
+          }
+        }
+      }
+    }
   });
 
   // Chart 3: Operacional => Top clientes; RH => Top técnicos
@@ -1301,7 +2019,7 @@ function buildCharts(){
 }
 
 /* =========================
-   TABELA + DRILL (mantidos)
+   TABELA + DRILL
 ========================= */
 function renderTable(){
   pageSize = Number(el("pageSize").value || 50);
@@ -1436,140 +2154,6 @@ function closeDrill(){
 }
 
 /* =========================
-   COMPARAÇÃO MÊS (mantida)
-========================= */
-function monthsAvailableFrom(arr){
-  return uniqSorted(arr.map(r=>r.month).filter(Boolean));
-}
-function fillMonthsFromFiltered(){
-  const ms = monthsAvailableFrom(filtered.length ? filtered : rawRecords);
-  const keepA = mA.value, keepB = mB.value;
-
-  mA.innerHTML = `<option value="">(Mês A)</option>` + ms.map(x=>`<option value="${x}">${x}</option>`).join("");
-  mB.innerHTML = `<option value="">(Mês B)</option>` + ms.map(x=>`<option value="${x}">${x}</option>`).join("");
-
-  if (ms.includes(keepA)) mA.value = keepA;
-  if (ms.includes(keepB)) mB.value = keepB;
-
-  if ((!mA.value || !mB.value) && ms.length>=2){
-    mA.value = ms[ms.length-2];
-    mB.value = ms[ms.length-1];
-  } else if ((!mA.value || !mB.value) && ms.length===1){
-    mA.value = ms[0]; mB.value = ms[0];
-  }
-}
-function recsByMonth(m){ return filtered.filter(r=>r.month===m); }
-
-function renderMoM(){
-  const A = mA.value, B = mB.value;
-  if (!A || !B){
-    momKpis.innerHTML = `<div class="text-sm muted">Selecione Mês A e Mês B.</div>`;
-    return;
-  }
-
-  const ra = recsByMonth(A);
-  const rb = recsByMonth(B);
-
-  const acresA = ra.reduce((a,r)=>a+(r.acrescimo||0),0);
-  const acresB = rb.reduce((a,r)=>a+(r.acrescimo||0),0);
-
-  const eqA = sumEquip(ra);
-  const eqB = sumEquip(rb);
-
-  const delta = (x,y)=> (y-x);
-  const pct = (x,y)=> (x? Math.round(((y-x)/x)*100) : null);
-
-  const cards = [
-    {t:"Chamados", a:ra.length, b:rb.length},
-    {t:"Acréscimos", a:acresA, b:acresB},
-    {t:"Equip (qty)", a:eqA, b:eqB},
-    {t:"Reincidência (%)", a: calcReinc(ra).pct, b: calcReinc(rb).pct}
-  ];
-
-  momKpis.innerHTML = "";
-  for (const c of cards){
-    const d = (c.a===null || c.b===null) ? null : delta(c.a, c.b);
-    const p = (c.a===null || c.b===null) ? null : pct(c.a, c.b);
-
-    const div = document.createElement("div");
-    div.className = "card rounded-2xl p-4 bg-white";
-    div.innerHTML = `
-      <div class="text-xs muted">${escapeHtml(c.t)}</div>
-      <div class="mt-1 text-sm mono">A ${mono(c.a===null?"—":c.a)} → B ${mono(c.b===null?"—":c.b)}</div>
-      <div class="mt-2 text-2xl font-semibold mono">
-        ${d===null ? "—" : (d>=0 ? "+"+d : d)} ${p===null ? "" : `<span class="text-sm muted">(${p>=0?"+":""}${p}%)</span>`}
-      </div>
-    `;
-    momKpis.appendChild(div);
-  }
-
-  destroyIfExists(momChart1);
-  momChart1 = new Chart(el("momChart1"), {
-    type:"bar",
-    data:{
-      labels:["Chamados","Acréscimos","Equip (qty)","Reincidência (%)"],
-      datasets:[
-        {label:`${A}`, data:[ra.length, acresA, eqA, calcReinc(ra).pct]},
-        {label:`${B}`, data:[rb.length, acresB, eqB, calcReinc(rb).pct]}
-      ]
-    },
-    options:{ responsive:true, plugins:{legend:{display:true}}, scales:{y:{beginAtZero:true,ticks:{precision:0}}}}
-  });
-  el("momG1Meta").textContent = `${A} vs ${B}`;
-
-  const mod = moduleSel.value;
-  const keyFn = (mod==="rh") ? (r=>r.tecnico||"(vazio)") : (r=>r.cliente||"(vazio)");
-
-  const mapA = groupCount(ra, keyFn);
-  const mapB = groupCount(rb, keyFn);
-
-  const allKeys = new Set([...mapA.keys(), ...mapB.keys()]);
-  const diffs = [];
-  for (const k of allKeys){
-    const a = mapA.get(k)||0;
-    const b = mapB.get(k)||0;
-    diffs.push([k, b-a, a, b]);
-  }
-  diffs.sort((x,y)=>Math.abs(y[1]) - Math.abs(x[1]));
-  const top = diffs.slice(0,10);
-
-  destroyIfExists(momChart2);
-  momChart2 = new Chart(el("momChart2"), {
-    type:"bar",
-    data:{ labels: top.map(x=>x[0]), datasets:[{label:"Δ (B-A)", data: top.map(x=>x[1])}] },
-    options:{ responsive:true, plugins:{legend:{display:false}}, scales:{y:{beginAtZero:true,ticks:{precision:0}}}}
-  });
-  el("momG2Meta").textContent = (mod==="rh") ? "Por técnico" : "Por cliente";
-
-  momTableWrap.innerHTML = `
-    <div class="text-sm font-semibold">Top mudanças (detalhado)</div>
-    <div class="text-xs muted">${(mod==="rh") ? "Técnicos" : "Clientes"} com maior variação absoluta</div>
-    <div class="overflow-auto mt-3 border rounded-2xl">
-      <table class="min-w-full text-sm">
-        <thead class="bg-slate-100">
-          <tr class="text-left">
-            <th class="p-2">${(mod==="rh")?"Técnico":"Cliente"}</th>
-            <th class="p-2">A</th>
-            <th class="p-2">B</th>
-            <th class="p-2">Δ</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${top.map(([k,d,a,b])=>`
-            <tr class="border-t hover:bg-slate-50">
-              <td class="p-2">${escapeHtml(k)}</td>
-              <td class="p-2 mono">${a}</td>
-              <td class="p-2 mono">${b}</td>
-              <td class="p-2 mono font-semibold">${d>=0?"+":""}${d}</td>
-            </tr>
-          `).join("")}
-        </tbody>
-      </table>
-    </div>
-  `;
-}
-
-/* =========================
    AUTOCOMPLETE CLIENTE
 ========================= */
 let clientNames = [];
@@ -1681,7 +2265,7 @@ function refreshFilterOptions(){
   }
 
   clientNames = clientes;
-  fillMonthsFromFiltered();
+  fillMonthsCheckboxes();
 }
 
 function renderMeta(){
@@ -1703,7 +2287,8 @@ function showPage(pageKey){
     b.classList.toggle("activeNav", b.getAttribute("data-page")===pageKey);
   });
 
-  if (pageKey==="comparativo") renderMoM();
+  if (pageKey==="comparativo") renderMonthlyComparison();
+  if (pageKey==="alertas") renderAlerts();
 }
 navBtns.forEach(btn=>{
   btn.addEventListener("click", ()=>showPage(btn.getAttribute("data-page")));
@@ -1719,7 +2304,6 @@ function renderAll(){
   renderDominantEquip();
   renderEquipHealth();
   renderTable();
-  renderMoM();
 
   const ok = filtered.length > 0;
   btnExportCSV.disabled = !ok;
@@ -1735,6 +2319,7 @@ function resetFilters(reRender=true){
   fDe.value=""; fAte.value=""; fSearch.value="";
   clientSearch.value="";
   clientSuggest.classList.add("hidden"); clientSuggest.innerHTML="";
+  selectedMonths.clear();
   page=1;
   if (reRender) applyFilters();
 }
@@ -1751,7 +2336,11 @@ fileInput.addEventListener("change", async (e)=>{
 
   try{
     rawRecords = await loadXLSX(file);
+    if (!rawRecords.length) throw new Error("Planilha vazia ou sem dados válidos");
+    
     equipColumns = detectEquipColumns(rawRecords);
+    healthSelectedCol = null;
+    selectedMonths.clear();
 
     refreshFilterOptions();
     applyModuleUI();
@@ -1762,9 +2351,12 @@ fileInput.addEventListener("change", async (e)=>{
 
     applyFilters();
   }catch(err){
-    console.error(err);
+    console.error("Erro ao carregar arquivo:", err);
     dotStatus.className = "w-2.5 h-2.5 rounded-full bg-rose-500";
-    statusLine.textContent = "Erro ao carregar XLSX.";
+    statusLine.textContent = `Erro: ${err.message || "Formato inválido"}`;
+    rawRecords = [];
+    filtered = [];
+    renderAll();
   }finally{
     fileInput.value="";
   }
@@ -1780,10 +2372,13 @@ btnExportCSV.addEventListener("click", exportCSV);
 btnExportJSON.addEventListener("click", exportJSON);
 
 [fBase, fCliente, fTecnico, fTipo, fEquip, fDe, fAte].forEach(x=>x.addEventListener("change", applyFilters));
-fSearch.addEventListener("input", debounce(applyFilters, 180));
+fSearch.addEventListener("input", debounce(applyFilters, 300));
 
-reincDias.addEventListener("change", renderAll);
-reincWords.addEventListener("change", renderAll);
+// Eventos de alertas
+alertDias.addEventListener("change", renderAlerts);
+alertMinManut.addEventListener("change", renderAlerts);
+btnRefreshAlerts.addEventListener("click", renderAlerts);
+
 healthWindowDays.addEventListener("change", renderEquipHealth);
 
 el("pageSize").addEventListener("change", ()=>{ page=1; renderTable(); });
@@ -1792,14 +2387,6 @@ btnNext.addEventListener("click", ()=>{ page=page+1; renderTable(); });
 
 dClose.addEventListener("click", closeDrill);
 drillModal.addEventListener("click", (e)=>{ if (e.target===drillModal) closeDrill(); });
-
-btnSwap.addEventListener("click", ()=>{
-  const a=mA.value, b=mB.value;
-  mA.value=b; mB.value=a;
-  renderMoM();
-});
-mA.addEventListener("change", renderMoM);
-mB.addEventListener("change", renderMoM);
 
 clientSearch.addEventListener("input", ()=>updateSuggest(clientSearch.value));
 clientSearch.addEventListener("keydown", (e)=>{
@@ -1841,8 +2428,8 @@ function debounce(fn, ms){
   chart3 = new Chart(el("chart3"), empty);
   chart4 = new Chart(el("chart4"), empty);
 
-  momChart1 = new Chart(el("momChart1"), empty);
-  momChart2 = new Chart(el("momChart2"), empty);
+  compareChart1 = new Chart(el("compareChart1"), empty);
+  compareChart2 = new Chart(el("compareChart2"), empty);
 
   // navegação inicial
   showPage("dashboard");
