@@ -16,6 +16,8 @@
     .mono { font-variant-numeric: tabular-nums; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono","Courier New", monospace; }
     .chip { border: 1px solid rgba(148,163,184,.45); }
     .shadowSoft { box-shadow: 0 10px 30px rgba(2,6,23,.08); }
+    .shadowMedium { box-shadow: 0 15px 40px rgba(2,6,23,.12); }
+    .shadowStrong { box-shadow: 0 20px 50px rgba(2,6,23,.15); }
     .btn { border: 1px solid rgba(148,163,184,.55); }
     .btnPrimary { background: rgb(15 23 42); color: white; border-color: rgb(15 23 42); }
     .btnPrimary:hover { filter: brightness(1.08); }
@@ -30,6 +32,10 @@
     .alert-expanded { background-color: #f8fafc; }
     .alert-details { max-height: 0; overflow: hidden; transition: max-height 0.3s ease-out; }
     .alert-details.open { max-height: 500px; }
+    
+    /* Estilos para acréscimos */
+    .acresc-case { border-left: 4px solid #10b981; background-color: #f0fdf4; }
+    .acresc-case.expanded { background-color: #f8fafc; }
   </style>
 </head>
 
@@ -43,9 +49,9 @@
 
   <div class="max-w-[1400px] mx-auto px-4 py-4">
     <!-- TOP BAR -->
-    <header class="glass shadowSoft card rounded-2xl px-4 py-4 flex items-center justify-between gap-3 flex-wrap">
+    <header class="glass shadowStrong card rounded-2xl px-4 py-4 flex items-center justify-between gap-3 flex-wrap">
       <div class="flex items-start gap-3">
-        <div class="w-10 h-10 rounded-2xl bg-slate-900 text-white flex items-center justify-center font-semibold">SC</div>
+        <div class="w-10 h-10 rounded-2xl bg-slate-900 text-white flex items-center justify-center font-semibold shadowMedium">SC</div>
         <div>
           <div class="text-xl font-semibold text-slate-900">Portal • Operacional & RH</div>
           <div class="text-xs muted">KPIs • Mix • Equip líderes por tipo • Comparação mês • Saúde por equipamento (todos) • Alertas</div>
@@ -53,30 +59,30 @@
       </div>
 
       <div class="flex items-center gap-2 flex-wrap">
-        <label class="btn btnPrimary px-3 py-2 rounded-xl cursor-pointer text-sm shadowSoft">
+        <label class="btn btnPrimary px-3 py-2 rounded-xl cursor-pointer text-sm shadowSoft hover:shadowMedium">
           Carregar XLSX
           <input id="fileInput" type="file" accept=".xlsx,.xls" class="hidden"/>
         </label>
 
         <div class="flex items-center gap-2">
           <div class="text-xs muted">Módulo</div>
-          <select id="moduleSel" class="btn px-3 py-2 rounded-xl bg-white text-sm">
+          <select id="moduleSel" class="btn px-3 py-2 rounded-xl bg-white text-sm shadowSoft">
             <option value="operacoes" selected>Operacional</option>
             <option value="rh">RH</option>
           </select>
         </div>
 
-        <button id="btnReset" class="btn px-3 py-2 rounded-xl bg-white text-sm">Reset</button>
+        <button id="btnReset" class="btn px-3 py-2 rounded-xl bg-white text-sm shadowSoft">Reset</button>
 
-        <button id="btnExportCSV" class="btn px-3 py-2 rounded-xl bg-white text-sm disabled:opacity-50" disabled>CSV</button>
-        <button id="btnExportJSON" class="btn px-3 py-2 rounded-xl bg-white text-sm disabled:opacity-50" disabled>JSON</button>
+        <button id="btnExportCSV" class="btn px-3 py-2 rounded-xl bg-white text-sm disabled:opacity-50 shadowSoft" disabled>CSV</button>
+        <button id="btnExportJSON" class="btn px-3 py-2 rounded-xl bg-white text-sm disabled:opacity-50 shadowSoft" disabled>JSON</button>
       </div>
     </header>
 
     <div class="grid grid-cols-1 lg:grid-cols-12 gap-4 mt-4">
       <!-- SIDEBAR -->
       <aside class="lg:col-span-3">
-        <div class="glass shadowSoft card rounded-2xl p-3">
+        <div class="glass shadowMedium card rounded-2xl p-3">
           <div class="flex items-center justify-between">
             <div class="text-sm font-semibold">Navegação</div>
             <div class="w-2.5 h-2.5 rounded-full bg-slate-300" id="dotStatus"></div>
@@ -85,43 +91,48 @@
           <div class="text-xs muted mt-1" id="statusLine">Carregue um XLSX para iniciar.</div>
 
           <div class="grid grid-cols-2 gap-2 mt-3 text-xs">
-            <div class="chip rounded-xl p-2 bg-white">
+            <div class="chip rounded-xl p-2 bg-white shadowSoft">
               <div class="muted">Registros</div>
               <div class="mono font-semibold" id="metaTotal">—</div>
             </div>
-            <div class="chip rounded-xl p-2 bg-white">
+            <div class="chip rounded-xl p-2 bg-white shadowSoft">
               <div class="muted">Período</div>
               <div class="mono font-semibold" id="metaPeriod">—</div>
             </div>
-            <div class="chip rounded-xl p-2 bg-white">
+            <div class="chip rounded-xl p-2 bg-white shadowSoft">
               <div class="muted">Equip col.</div>
               <div class="mono font-semibold" id="metaEquip">—</div>
             </div>
-            <div class="chip rounded-xl p-2 bg-white">
+            <div class="chip rounded-xl p-2 bg-white shadowSoft">
               <div class="muted">Após filtros</div>
               <div class="mono font-semibold" id="metaFiltered">—</div>
             </div>
           </div>
 
           <div class="mt-4 space-y-2">
-            <button class="navBtn btn w-full text-left px-3 py-2 rounded-xl bg-white activeNav" data-page="dashboard">
+            <button class="navBtn btn w-full text-left px-3 py-2 rounded-xl bg-white activeNav shadowSoft" data-page="dashboard">
               <div class="text-sm font-semibold">Dashboard</div>
               <div class="text-xs muted">KPIs + gráficos + insights</div>
             </button>
 
-            <button class="navBtn btn w-full text-left px-3 py-2 rounded-xl bg-white" data-page="comparativo">
+            <button class="navBtn btn w-full text-left px-3 py-2 rounded-xl bg-white shadowSoft" data-page="comparativo">
               <div class="text-sm font-semibold">Comparação mês</div>
               <div class="text-xs muted">Análise mensal por tipo de serviço</div>
             </button>
 
-            <button class="navBtn btn w-full text-left px-3 py-2 rounded-xl bg-white" data-page="registros">
+            <button class="navBtn btn w-full text-left px-3 py-2 rounded-xl bg-white shadowSoft" data-page="registros">
               <div class="text-sm font-semibold">Registros</div>
               <div class="text-xs muted">Tabela filtrada + drill</div>
             </button>
 
-            <button class="navBtn btn w-full text-left px-3 py-2 rounded-xl bg-white" data-page="alertas">
+            <button class="navBtn btn w-full text-left px-3 py-2 rounded-xl bg-white shadowSoft" data-page="alertas">
               <div class="text-sm font-semibold">Alertas</div>
               <div class="text-xs muted">Clientes problemáticos + situações críticas</div>
+            </button>
+
+            <button class="navBtn btn w-full text-left px-3 py-2 rounded-xl bg-white shadowSoft" data-page="acrescimos">
+              <div class="text-sm font-semibold">Efetividade dos acréscimos</div>
+              <div class="text-xs muted">Análise de reincidência pós-acréscimo</div>
             </button>
           </div>
 
@@ -131,13 +142,13 @@
         </div>
 
         <!-- FILTERS -->
-        <div class="glass shadowSoft card rounded-2xl p-3 mt-4">
+        <div class="glass shadowMedium card rounded-2xl p-3 mt-4">
           <div class="text-sm font-semibold">Filtros</div>
           <div class="text-xs muted">Aplique e o portal recalcula tudo.</div>
 
           <div class="mt-3">
             <label class="text-xs muted">Base</label>
-            <select id="fBase" class="mt-1 w-full px-3 py-2 rounded-xl border bg-white">
+            <select id="fBase" class="mt-1 w-full px-3 py-2 rounded-xl border bg-white shadowSoft">
               <option value="">(Conecta + Visium)</option>
               <option value="Conecta">Conecta</option>
               <option value="Visium">Visium</option>
@@ -146,25 +157,25 @@
 
           <div id="wrapCliente" class="mt-3">
             <label class="text-xs muted">Cliente (busca)</label>
-            <input id="clientSearch" class="mt-1 w-full px-3 py-2 rounded-xl border bg-white" placeholder="Digite e selecione…"/>
-            <div id="clientSuggest" class="hidden mt-1 border rounded-xl bg-white max-h-56 overflow-auto"></div>
+            <input id="clientSearch" class="mt-1 w-full px-3 py-2 rounded-xl border bg-white shadowSoft" placeholder="Digite e selecione…"/>
+            <div id="clientSuggest" class="hidden mt-1 border rounded-xl bg-white max-h-56 overflow-auto shadowMedium"></div>
 
             <label class="text-xs muted mt-2 block">Cliente (filtro)</label>
-            <select id="fCliente" class="mt-1 w-full px-3 py-2 rounded-xl border bg-white">
+            <select id="fCliente" class="mt-1 w-full px-3 py-2 rounded-xl border bg-white shadowSoft">
               <option value="">(Todos)</option>
             </select>
           </div>
 
           <div class="mt-3">
             <label class="text-xs muted">Técnico</label>
-            <select id="fTecnico" class="mt-1 w-full px-3 py-2 rounded-xl border bg-white">
+            <select id="fTecnico" class="mt-1 w-full px-3 py-2 rounded-xl border bg-white shadowSoft">
               <option value="">(Todos)</option>
             </select>
           </div>
 
           <div class="mt-3">
             <label class="text-xs muted">Tipo de chamado</label>
-            <select id="fTipo" class="mt-1 w-full px-3 py-2 rounded-xl border bg-white">
+            <select id="fTipo" class="mt-1 w-full px-3 py-2 rounded-xl border bg-white shadowSoft">
               <option value="">(Todos)</option>
             </select>
             <div class="text-[11px] muted mt-1">Padronizado para: Montagem, Manutenção, Retirada, Troca, Revisão.</div>
@@ -172,7 +183,7 @@
 
           <div class="mt-3" id="wrapEquip">
             <label class="text-xs muted">Equipamento (coluna)</label>
-            <select id="fEquip" class="mt-1 w-full px-3 py-2 rounded-xl border bg-white">
+            <select id="fEquip" class="mt-1 w-full px-3 py-2 rounded-xl border bg-white shadowSoft">
               <option value="">(Todos)</option>
             </select>
           </div>
@@ -180,34 +191,34 @@
           <div class="grid grid-cols-2 gap-2 mt-3">
             <div>
               <label class="text-xs muted">De</label>
-              <input id="fDe" type="date" class="mt-1 w-full px-3 py-2 rounded-xl border bg-white"/>
+              <input id="fDe" type="date" class="mt-1 w-full px-3 py-2 rounded-xl border bg-white shadowSoft"/>
             </div>
             <div>
               <label class="text-xs muted">Até</label>
-              <input id="fAte" type="date" class="mt-1 w-full px-3 py-2 rounded-xl border bg-white"/>
+              <input id="fAte" type="date" class="mt-1 w-full px-3 py-2 rounded-xl border bg-white shadowSoft"/>
             </div>
           </div>
 
           <div class="mt-3">
             <label class="text-xs muted">Busca geral</label>
-            <input id="fSearch" class="mt-1 w-full px-3 py-2 rounded-xl border bg-white" placeholder="Ex.: retirada, All Easy, 28946…"/>
+            <input id="fSearch" class="mt-1 w-full px-3 py-2 rounded-xl border bg-white shadowSoft" placeholder="Ex.: retirada, All Easy, 28946…"/>
           </div>
 
           <div class="grid grid-cols-2 gap-2 mt-3">
             <div>
               <label class="text-xs muted">Alerta: dias entre manutenções</label>
-              <input id="alertDias" type="number" min="1" value="30" class="mt-1 w-full px-3 py-2 rounded-xl border bg-white"/>
+              <input id="alertDias" type="number" min="1" value="30" class="mt-1 w-full px-3 py-2 rounded-xl border bg-white shadowSoft"/>
             </div>
             <div>
               <label class="text-xs muted">Min. manutenções</label>
-              <input id="alertMinManut" type="number" min="2" value="3" class="mt-1 w-full px-3 py-2 rounded-xl border bg-white"/>
+              <input id="alertMinManut" type="number" min="2" value="3" class="mt-1 w-full px-3 py-2 rounded-xl border bg-white shadowSoft"/>
             </div>
           </div>
 
           <!-- NEW: Health window for ALL equipment -->
           <div id="wrapHealthWin" class="mt-3">
             <label class="text-xs muted">Saúde: janela pós-montagem (dias)</label>
-            <input id="healthWindowDays" type="number" min="1" value="14" class="mt-1 w-full px-3 py-2 rounded-xl border bg-white"/>
+            <input id="healthWindowDays" type="number" min="1" value="14" class="mt-1 w-full px-3 py-2 rounded-xl border bg-white shadowSoft"/>
             <div class="text-[11px] muted mt-1">Detecta Manutenção até X dias após Montagem (entrega=montagem), por cliente + coluna de equipamento.</div>
           </div>
         </div>
@@ -216,17 +227,17 @@
       <!-- MAIN -->
       <section class="lg:col-span-9 space-y-4">
         <!-- PAGE: DASHBOARD -->
-        <div id="page-dashboard" class="glass shadowSoft card rounded-2xl p-4">
+        <div id="page-dashboard" class="glass shadowMedium card rounded-2xl p-4">
           <div class="flex items-start justify-between gap-3 flex-wrap">
             <div>
               <div class="text-lg font-semibold">Dashboard</div>
               <div class="text-xs muted">KPIs do recorte + mix + equipamentos + saúde por equipamento</div>
             </div>
             <div class="flex items-center gap-2 flex-wrap">
-              <div class="chip rounded-xl px-3 py-2 bg-white text-xs">
+              <div class="chip rounded-xl px-3 py-2 bg-white text-xs shadowSoft">
                 <span class="muted">Mês detectado:</span> <span class="mono font-semibold" id="currentMonthLabel">—</span>
               </div>
-              <div class="chip rounded-xl px-3 py-2 bg-white text-xs">
+              <div class="chip rounded-xl px-3 py-2 bg-white text-xs shadowSoft">
                 <span class="muted">Tendência:</span> <span class="mono font-semibold" id="trendLabel">—</span>
               </div>
             </div>
@@ -235,7 +246,7 @@
           <div id="kpiGrid" class="grid grid-cols-1 md:grid-cols-4 gap-3 mt-4"></div>
 
           <div class="grid grid-cols-1 lg:grid-cols-2 gap-3 mt-4">
-            <div class="card rounded-2xl p-3 bg-white">
+            <div class="card rounded-2xl p-3 bg-white shadowMedium">
               <div class="flex items-center justify-between">
                 <div class="text-sm font-semibold">Chamados por dia</div>
                 <div class="text-xs muted" id="g1meta">—</div>
@@ -243,7 +254,7 @@
               <canvas id="chart1" height="120"></canvas>
             </div>
 
-            <div class="card rounded-2xl p-3 bg-white">
+            <div class="card rounded-2xl p-3 bg-white shadowMedium">
               <div class="flex items-center justify-between">
                 <div class="text-sm font-semibold">Mix de tipo</div>
                 <div class="text-xs muted" id="g2meta">—</div>
@@ -251,7 +262,7 @@
               <canvas id="chart2" height="120"></canvas>
             </div>
 
-            <div class="card rounded-2xl p-3 bg-white">
+            <div class="card rounded-2xl p-3 bg-white shadowMedium">
               <div class="flex items-center justify-between">
                 <div class="text-sm font-semibold" id="g3title">Top clientes (volume)</div>
                 <div class="text-xs muted" id="g3meta">—</div>
@@ -259,7 +270,7 @@
               <canvas id="chart3" height="120"></canvas>
             </div>
 
-            <div class="card rounded-2xl p-3 bg-white">
+            <div class="card rounded-2xl p-3 bg-white shadowMedium">
               <div class="flex items-center justify-between">
                 <div class="text-sm font-semibold">Top equipamentos (qty)</div>
                 <div class="text-xs muted" id="g4meta">—</div>
@@ -269,14 +280,14 @@
           </div>
 
           <!-- OP: equipamento líder por tipo dominante -->
-          <div id="opDominantEquip" class="hidden mt-4 card rounded-2xl p-4 bg-white"></div>
+          <div id="opDominantEquip" class="hidden mt-4 card rounded-2xl p-4 bg-white shadowMedium"></div>
 
           <!-- OP: Health (ALL equipment) -->
-          <div id="equipHealthWrap" class="hidden mt-4 card rounded-2xl p-4 bg-white"></div>
+          <div id="equipHealthWrap" class="hidden mt-4 card rounded-2xl p-4 bg-white shadowMedium"></div>
         </div>
 
         <!-- PAGE: COMPARATIVO -->
-        <div id="page-comparativo" class="hidden glass shadowSoft card rounded-2xl p-4">
+        <div id="page-comparativo" class="hidden glass shadowMedium card rounded-2xl p-4">
           <div class="flex items-start justify-between flex-wrap gap-3">
             <div>
               <div class="text-lg font-semibold">Comparação mensal</div>
@@ -285,7 +296,7 @@
           </div>
 
           <!-- Seletor de meses -->
-          <div class="mt-4 card rounded-2xl p-3 bg-white">
+          <div class="mt-4 card rounded-2xl p-3 bg-white shadowMedium">
             <div class="text-sm font-semibold">Selecione os meses para comparar</div>
             <div class="text-xs muted mt-1">Clique nos meses que deseja incluir na análise</div>
             <div id="monthsCheckboxContainer" class="mt-3 flex flex-wrap gap-2"></div>
@@ -296,7 +307,7 @@
 
           <!-- Gráficos -->
           <div class="grid grid-cols-1 lg:grid-cols-2 gap-3 mt-4">
-            <div class="card rounded-2xl p-3 bg-white">
+            <div class="card rounded-2xl p-3 bg-white shadowMedium">
               <div class="flex items-center justify-between">
                 <div class="text-sm font-semibold">Comparação por tipo de serviço</div>
                 <div class="text-xs muted" id="compareMeta1">—</div>
@@ -304,7 +315,7 @@
               <canvas id="compareChart1" height="160"></canvas>
             </div>
 
-            <div class="card rounded-2xl p-3 bg-white">
+            <div class="card rounded-2xl p-3 bg-white shadowMedium">
               <div class="flex items-center justify-between">
                 <div class="text-sm font-semibold">Evolução mensal total</div>
                 <div class="text-xs muted" id="compareMeta2">—</div>
@@ -314,10 +325,10 @@
           </div>
 
           <!-- Tabela comparativa -->
-          <div class="mt-4 card rounded-2xl p-3 bg-white">
+          <div class="mt-4 card rounded-2xl p-3 bg-white shadowMedium">
             <div class="text-sm font-semibold">Tabela comparativa detalhada</div>
             <div class="text-xs muted">Valores por tipo de serviço em cada mês selecionado</div>
-            <div class="mt-3 overflow-auto border rounded-2xl">
+            <div class="mt-3 overflow-auto border rounded-2xl shadowSoft">
               <table class="min-w-full text-sm">
                 <thead class="bg-slate-100">
                   <tr class="text-left">
@@ -332,7 +343,7 @@
         </div>
 
         <!-- PAGE: REGISTROS -->
-        <div id="page-registros" class="hidden glass shadowSoft card rounded-2xl p-4">
+        <div id="page-registros" class="hidden glass shadowMedium card rounded-2xl p-4">
           <div class="flex items-center justify-between flex-wrap gap-2">
             <div>
               <div class="text-lg font-semibold">Registros</div>
@@ -340,7 +351,7 @@
             </div>
             <div class="flex items-center gap-2">
               <span class="text-xs muted">Linhas:</span>
-              <select id="pageSize" class="btn px-2 py-1 rounded-xl bg-white text-sm">
+              <select id="pageSize" class="btn px-2 py-1 rounded-xl bg-white text-sm shadowSoft">
                 <option value="25">25</option>
                 <option value="50" selected>50</option>
                 <option value="100">100</option>
@@ -349,7 +360,7 @@
             </div>
           </div>
 
-          <div class="overflow-auto mt-3 border rounded-2xl bg-white">
+          <div class="overflow-auto mt-3 border rounded-2xl bg-white shadowMedium">
             <table class="min-w-full text-sm">
               <thead class="bg-slate-100 sticky top-0">
                 <tr class="text-left">
@@ -370,25 +381,25 @@
           <div class="flex items-center justify-between mt-3">
             <div class="text-xs muted" id="pagerInfo">—</div>
             <div class="flex items-center gap-2">
-              <button id="btnPrev" class="btn px-3 py-1.5 rounded-xl bg-white text-sm">Anterior</button>
-              <button id="btnNext" class="btn px-3 py-1.5 rounded-xl bg-white text-sm">Próximo</button>
+              <button id="btnPrev" class="btn px-3 py-1.5 rounded-xl bg-white text-sm shadowSoft">Anterior</button>
+              <button id="btnNext" class="btn px-3 py-1.5 rounded-xl bg-white text-sm shadowSoft">Próximo</button>
             </div>
           </div>
         </div>
 
         <!-- PAGE: ALERTAS (NOVA) -->
-        <div id="page-alertas" class="hidden glass shadowSoft card rounded-2xl p-4">
+        <div id="page-alertas" class="hidden glass shadowMedium card rounded-2xl p-4">
           <div class="flex items-center justify-between flex-wrap gap-2 mb-4">
             <div>
               <div class="text-lg font-semibold">Alertas - Situações Críticas</div>
               <div class="text-xs muted">Clientes com múltiplas manutenções em pouco tempo. Clique para expandir detalhes.</div>
             </div>
             <div class="flex items-center gap-2">
-              <div class="chip rounded-xl px-3 py-2 bg-white text-xs">
+              <div class="chip rounded-xl px-3 py-2 bg-white text-xs shadowSoft">
                 <span class="muted">Período de alerta:</span> 
                 <span class="mono font-semibold" id="alertPeriodLabel">30 dias</span>
               </div>
-              <button id="btnRefreshAlerts" class="btn px-3 py-1.5 rounded-xl bg-white text-sm">Atualizar alertas</button>
+              <button id="btnRefreshAlerts" class="btn px-3 py-1.5 rounded-xl bg-white text-sm shadowSoft">Atualizar alertas</button>
             </div>
           </div>
 
@@ -406,7 +417,7 @@
           </div>
 
           <!-- Legenda -->
-          <div class="mt-4 p-3 bg-white border rounded-xl">
+          <div class="mt-4 p-3 bg-white border rounded-xl shadowSoft">
             <div class="text-sm font-semibold mb-2">Legenda dos alertas:</div>
             <div class="grid grid-cols-1 md:grid-cols-3 gap-2 text-xs">
               <div class="flex items-center gap-2">
@@ -427,28 +438,82 @@
             </div>
           </div>
         </div>
+
+        <!-- PAGE: ACRÉSCIMOS (NOVA) -->
+        <div id="page-acrescimos" class="hidden glass shadowMedium card rounded-2xl p-4">
+          <div class="flex items-center justify-between flex-wrap gap-2 mb-4">
+            <div>
+              <div class="text-lg font-semibold">Efetividade dos Acréscimos</div>
+              <div class="text-xs muted">Análise de reincidência após acréscimos. Detectar se teve acréscimo e logo depois outro chamado.</div>
+            </div>
+            <div class="flex items-center gap-2">
+              <div class="chip rounded-xl px-3 py-2 bg-white text-xs shadowSoft">
+                <span class="muted">Período de análise:</span> 
+                <span class="mono font-semibold" id="acrescPeriodLabel">7 dias</span>
+              </div>
+              <button id="btnRefreshAcresc" class="btn px-3 py-1.5 rounded-xl bg-white text-sm shadowSoft">Atualizar análise</button>
+            </div>
+          </div>
+
+          <!-- Controles -->
+          <div class="card rounded-2xl p-4 bg-white shadowMedium mb-4">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <div>
+                <label class="text-xs muted">Dias para análise pós-acréscimo</label>
+                <input id="acrescWindowDays" type="number" min="1" value="7" class="mt-1 w-full px-3 py-2 rounded-xl border bg-white shadowSoft"/>
+              </div>
+              <div>
+                <label class="text-xs muted">Tipo de chamado considerado</label>
+                <select id="acrescTipo" class="mt-1 w-full px-3 py-2 rounded-xl border bg-white shadowSoft">
+                  <option value="">Todos os tipos</option>
+                  <option value="Manutenção" selected>Manutenção</option>
+                  <option value="Retirada">Retirada</option>
+                  <option value="Troca">Troca</option>
+                  <option value="Revisão">Revisão</option>
+                </select>
+              </div>
+              <div>
+                <label class="text-xs muted">Cliente específico (opcional)</label>
+                <input id="acrescCliente" class="mt-1 w-full px-3 py-2 rounded-xl border bg-white shadowSoft" placeholder="Digite o nome do cliente"/>
+              </div>
+            </div>
+          </div>
+
+          <!-- KPIs de acréscimos -->
+          <div id="acrescSummary" class="mb-4 grid grid-cols-1 md:grid-cols-4 gap-3">
+            <!-- Será preenchido dinamicamente -->
+          </div>
+
+          <!-- Casos de reincidência -->
+          <div id="acrescCasesContainer" class="space-y-3">
+            <div class="text-sm muted text-center p-4" id="noAcrescMessage">
+              Nenhum caso de reincidência pós-acréscimo encontrado. Ajuste os critérios ou carregue mais dados.
+            </div>
+            <!-- Casos serão inseridos aqui -->
+          </div>
+        </div>
       </section>
     </div>
   </div>
 
   <!-- DRILL MODAL -->
   <div id="drillModal" class="fixed inset-0 bg-black/50 hidden items-center justify-center p-4">
-    <div class="glass shadowSoft card rounded-2xl w-full max-w-6xl p-0 overflow-hidden">
+    <div class="glass shadowStrong card rounded-2xl w-full max-w-6xl p-0 overflow-hidden">
       <div class="px-4 py-3 border-b bg-white flex items-start justify-between gap-3">
         <div>
           <div class="text-lg font-semibold" id="dTitle">Drill-down</div>
           <div class="text-xs muted" id="dSub">—</div>
         </div>
-        <button id="dClose" class="btn px-3 py-1.5 rounded-xl bg-white text-sm">Fechar</button>
+        <button id="dClose" class="btn px-3 py-1.5 rounded-xl bg-white text-sm shadowSoft">Fechar</button>
       </div>
 
       <div class="p-4 grid grid-cols-1 lg:grid-cols-3 gap-3">
-        <div class="card rounded-2xl p-3 bg-white">
+        <div class="card rounded-2xl p-3 bg-white shadowMedium">
           <div class="text-xs muted">KPIs</div>
           <div id="dKpis" class="mt-2 space-y-1 text-sm"></div>
         </div>
 
-        <div class="card rounded-2xl p-3 bg-white lg:col-span-2">
+        <div class="card rounded-2xl p-3 bg-white lg:col-span-2 shadowMedium">
           <div class="flex items-center justify-between">
             <div class="text-sm font-semibold">Linha do tempo</div>
             <div class="text-xs muted" id="dMeta">—</div>
@@ -456,17 +521,17 @@
           <canvas id="dChart" height="110"></canvas>
         </div>
 
-        <div class="card rounded-2xl p-3 bg-white">
+        <div class="card rounded-2xl p-3 bg-white shadowMedium">
           <div class="text-sm font-semibold">Top clientes</div>
           <div id="dTopClients" class="mt-2 space-y-1 text-sm"></div>
         </div>
 
-        <div class="card rounded-2xl p-3 bg-white">
+        <div class="card rounded-2xl p-3 bg-white shadowMedium">
           <div class="text-sm font-semibold">Top motivos</div>
           <div id="dTopReasons" class="mt-2 space-y-1 text-sm"></div>
         </div>
 
-        <div class="card rounded-2xl p-3 bg-white">
+        <div class="card rounded-2xl p-3 bg-white shadowMedium">
           <div class="text-sm font-semibold">Top equipamentos</div>
           <div id="dTopEquip" class="mt-2 space-y-1 text-sm"></div>
         </div>
@@ -563,10 +628,7 @@ let pageSize = 50;
 let healthSelectedCol = null;
 let selectedMonths = new Set();
 let alertsData = [];
-
-let chart1, chart2, chart3, chart4;
-let compareChart1, compareChart2;
-let dChart;
+let acrescData = [];
 
 /* =========================
    ELEMENTOS
@@ -620,7 +682,8 @@ const pages = {
   dashboard: el("page-dashboard"),
   comparativo: el("page-comparativo"),
   registros: el("page-registros"),
-  alertas: el("page-alertas")
+  alertas: el("page-alertas"),
+  acrescimos: el("page-acrescimos")
 };
 
 // Elementos da página de comparação
@@ -634,6 +697,16 @@ const btnRefreshAlerts = el("btnRefreshAlerts");
 const alertSummary = el("alertSummary");
 const alertsContainer = el("alertsContainer");
 const noAlertsMessage = el("noAlertsMessage");
+
+// Elementos da página de acréscimos
+const acrescPeriodLabel = el("acrescPeriodLabel");
+const btnRefreshAcresc = el("btnRefreshAcresc");
+const acrescWindowDays = el("acrescWindowDays");
+const acrescTipo = el("acrescTipo");
+const acrescCliente = el("acrescCliente");
+const acrescSummary = el("acrescSummary");
+const acrescCasesContainer = el("acrescCasesContainer");
+const noAcrescMessage = el("noAcrescMessage");
 
 // Drill
 const drillModal = el("drillModal");
@@ -879,25 +952,25 @@ function renderAlertSummary() {
   const total = alertsData.length;
   
   alertSummary.innerHTML = `
-    <div class="card rounded-2xl p-4 bg-white">
+    <div class="card rounded-2xl p-4 bg-white shadowMedium">
       <div class="text-xs muted">Total de alertas</div>
       <div class="text-2xl font-semibold mono">${total}</div>
       <div class="text-xs muted">Clientes problemáticos</div>
     </div>
     
-    <div class="card rounded-2xl p-4 bg-white alert-high">
+    <div class="card rounded-2xl p-4 bg-white alert-high shadowMedium">
       <div class="text-xs muted">Alta criticidade</div>
       <div class="text-2xl font-semibold mono">${high}</div>
       <div class="text-xs muted">5+ manutenções</div>
     </div>
     
-    <div class="card rounded-2xl p-4 bg-white alert-medium">
+    <div class="card rounded-2xl p-4 bg-white alert-medium shadowMedium">
       <div class="text-xs muted">Média criticidade</div>
       <div class="text-2xl font-semibold mono">${medium}</div>
       <div class="text-xs muted">3-4 manutenções</div>
     </div>
     
-    <div class="card rounded-2xl p-4 bg-white alert-low">
+    <div class="card rounded-2xl p-4 bg-white alert-low shadowMedium">
       <div class="text-xs muted">Baixa criticidade</div>
       <div class="text-2xl font-semibold mono">${low}</div>
       <div class="text-xs muted">Múltiplas manutenções</div>
@@ -907,7 +980,7 @@ function renderAlertSummary() {
 
 function createAlertElement(alert, index) {
   const alertDiv = document.createElement('div');
-  alertDiv.className = `mb-3 card rounded-2xl p-4 alert-${alert.severity}`;
+  alertDiv.className = `mb-3 card rounded-2xl p-4 alert-${alert.severity} shadowMedium`;
   alertDiv.id = `alert-${index}`;
   
   // Cabeçalho do alerta
@@ -956,7 +1029,7 @@ function createAlertElement(alert, index) {
   statsDiv.className = 'grid grid-cols-1 md:grid-cols-3 gap-3 mb-3';
   
   statsDiv.innerHTML = `
-    <div class="bg-white p-3 rounded-xl border">
+    <div class="bg-white p-3 rounded-xl border shadowSoft">
       <div class="text-xs muted">Equipamentos</div>
       <div class="text-sm mt-1">
         ${alert.equipamentos.length > 0 
@@ -965,7 +1038,7 @@ function createAlertElement(alert, index) {
       </div>
     </div>
     
-    <div class="bg-white p-3 rounded-xl border">
+    <div class="bg-white p-3 rounded-xl border shadowSoft">
       <div class="text-xs muted">Técnicos envolvidos</div>
       <div class="text-sm mt-1">
         ${alert.tecnicos.length > 0 
@@ -974,7 +1047,7 @@ function createAlertElement(alert, index) {
       </div>
     </div>
     
-    <div class="bg-white p-3 rounded-xl border">
+    <div class="bg-white p-3 rounded-xl border shadowSoft">
       <div class="text-xs muted">Motivos mais comuns</div>
       <div class="text-sm mt-1">
         ${alert.topMotivos.length > 0 
@@ -993,7 +1066,7 @@ function createAlertElement(alert, index) {
   details.appendChild(tableTitle);
   
   const tableContainer = document.createElement('div');
-  tableContainer.className = 'overflow-auto border rounded-xl';
+  tableContainer.className = 'overflow-auto border rounded-xl shadowSoft';
   
   const table = document.createElement('table');
   table.className = 'min-w-full text-sm';
@@ -1069,7 +1142,7 @@ function createAlertElement(alert, index) {
   actionButtons.className = 'flex gap-2';
   
   const filterBtn = document.createElement('button');
-  filterBtn.className = 'btn px-3 py-1.5 rounded-xl bg-white text-sm';
+  filterBtn.className = 'btn px-3 py-1.5 rounded-xl bg-white text-sm shadowSoft';
   filterBtn.textContent = 'Filtrar este cliente';
   filterBtn.addEventListener('click', (e) => {
     e.stopPropagation();
@@ -1079,7 +1152,7 @@ function createAlertElement(alert, index) {
   });
   
   const drillBtn = document.createElement('button');
-  drillBtn.className = 'btn px-3 py-1.5 rounded-xl bg-white text-sm';
+  drillBtn.className = 'btn px-3 py-1.5 rounded-xl bg-white text-sm shadowSoft';
   drillBtn.textContent = 'Ver drill-down';
   drillBtn.addEventListener('click', (e) => {
     e.stopPropagation();
@@ -1116,6 +1189,458 @@ function toggleAlertDetails(index) {
     alertDiv.classList.add('alert-expanded');
   }
 }
+
+/* =========================
+   ANÁLISE DE ACRÉSCIMOS - NOVA VERSÃO COM EXPANSÃO
+========================= */
+function analyzeAcrescimos() {
+  const windowDays = Math.max(1, toInt(acrescWindowDays.value));
+  const tipoFiltro = acrescTipo.value.trim();
+  const clienteFiltro = acrescCliente.value.trim().toLowerCase();
+  
+  acrescPeriodLabel.textContent = `${windowDays} dias`;
+  
+  // Obter registros com acréscimo
+  const recordsWithAcresc = filtered.filter(r => (r.acrescimo || 0) > 0);
+  
+  if (recordsWithAcresc.length === 0) {
+    acrescSummary.innerHTML = `
+      <div class="card rounded-2xl p-4 bg-white shadowMedium">
+        <div class="text-xs muted">Acréscimos encontrados</div>
+        <div class="text-2xl font-semibold mono">0</div>
+        <div class="text-xs muted">Nenhum acréscimo no período</div>
+      </div>
+      <div class="card rounded-2xl p-4 bg-white shadowMedium">
+        <div class="text-xs muted">Reincidência pós-acréscimo</div>
+        <div class="text-2xl font-semibold mono">0</div>
+        <div class="text-xs muted">Nenhum caso detectado</div>
+      </div>
+      <div class="card rounded-2xl p-4 bg-white shadowMedium">
+        <div class="text-xs muted">Clientes com reincidência</div>
+        <div class="text-2xl font-semibold mono">0</div>
+        <div class="text-xs muted">Nenhum cliente</div>
+      </div>
+      <div class="card rounded-2xl p-4 bg-white shadowMedium">
+        <div class="text-xs muted">Taxa de reincidência</div>
+        <div class="text-2xl font-semibold mono">0%</div>
+        <div class="text-xs muted">Sem dados para análise</div>
+      </div>
+    `;
+    
+    acrescCasesContainer.innerHTML = `
+      <div class="text-sm muted text-center p-4" id="noAcrescMessage">
+        Nenhum caso de reincidência pós-acréscimo encontrado. Ajuste os critérios ou carregue mais dados.
+      </div>
+    `;
+    return;
+  }
+  
+  // Agrupar por cliente
+  const byClient = new Map();
+  recordsWithAcresc.forEach(r => {
+    const key = r.cliente || "(vazio)";
+    if (!byClient.has(key)) byClient.set(key, []);
+    byClient.get(key).push(r);
+  });
+  
+  const results = [];
+  const clientesComReincidencia = new Set();
+  
+  // Analisar cada cliente
+  for (const [cliente, records] of byClient.entries()) {
+    if (clienteFiltro && cliente.toLowerCase().indexOf(clienteFiltro) === -1) continue;
+    
+    // Ordenar por data
+    const sorted = records.filter(r => r.data).sort((a, b) => a.data.localeCompare(b.data));
+    
+    if (sorted.length === 0) continue;
+    
+    // Para cada registro com acréscimo, procurar próximo chamado dentro da janela
+    for (let i = 0; i < sorted.length; i++) {
+      const current = sorted[i];
+      
+      // Buscar próximo chamado para este cliente (pode ser qualquer tipo, ou filtrado por tipo)
+      const nextRecords = filtered.filter(r => 
+        (r.cliente || "(vazio)") === cliente &&
+        r.data && r.data > current.data &&
+        (!tipoFiltro || r.tipo === tipoFiltro) &&
+        r.chamado !== current.chamado // Não é o mesmo chamado
+      );
+      
+      if (nextRecords.length === 0) continue;
+      
+      // Ordenar por data e pegar o mais próximo
+      const nextRecordsSorted = nextRecords.sort((a, b) => a.data.localeCompare(b.data));
+      const nextRecord = nextRecordsSorted[0];
+      
+      const daysDiff = daysBetween(current.data, nextRecord.data);
+      
+      if (daysDiff !== null && daysDiff <= windowDays) {
+        // Buscar equipamentos envolvidos
+        const equipamentosAcresc = [];
+        const equipamentosProximo = [];
+        
+        for (const col of equipColumns) {
+          const qtyAcresc = toInt((current._raw||{})[col]);
+          const qtyProximo = toInt((nextRecord._raw||{})[col]);
+          
+          if (qtyAcresc > 0) equipamentosAcresc.push(`${col} (${qtyAcresc})`);
+          if (qtyProximo > 0) equipamentosProximo.push(`${col} (${qtyProximo})`);
+        }
+        
+        results.push({
+          cliente,
+          dataAcresc: current.data,
+          chamadoAcresc: current.chamado,
+          tecnicoAcresc: current.tecnico,
+          motivoAcresc: current.motivo,
+          acrescimoValor: current.acrescimo || 0,
+          equipamentosAcresc,
+          dataProximo: nextRecord.data,
+          chamadoProximo: nextRecord.chamado,
+          tecnicoProximo: nextRecord.tecnico,
+          tipoProximo: nextRecord.tipo,
+          motivoProximo: nextRecord.motivo,
+          equipamentosProximo,
+          diasDiferenca: daysDiff,
+          // Manter os registros originais para detalhes
+          recordAcresc: current,
+          recordProximo: nextRecord
+        });
+        
+        clientesComReincidencia.add(cliente);
+      }
+    }
+  }
+  
+  // Agrupar resultados por cliente para exibição
+  const resultsByClient = new Map();
+  results.forEach(result => {
+    const key = result.cliente;
+    if (!resultsByClient.has(key)) resultsByClient.set(key, []);
+    resultsByClient.get(key).push(result);
+  });
+  
+  // Ordenar por cliente e depois por diferença de dias
+  const sortedClients = Array.from(resultsByClient.entries()).sort((a, b) => {
+    // Primeiro ordena pelo número de casos (mais casos primeiro)
+    if (b[1].length !== a[1].length) return b[1].length - a[1].length;
+    // Depois ordena pelo menor intervalo de dias
+    const minA = Math.min(...a[1].map(r => r.diasDiferenca));
+    const minB = Math.min(...b[1].map(r => r.diasDiferenca));
+    return minA - minB;
+  });
+  
+  acrescData = { results, resultsByClient: sortedClients };
+  
+  // Atualizar KPIs
+  const totalAcresc = recordsWithAcresc.length;
+  const totalReinc = results.length;
+  const clientesReinc = clientesComReincidencia.size;
+  const taxaReinc = totalAcresc > 0 ? Math.round((totalReinc / totalAcresc) * 100) : 0;
+  
+  acrescSummary.innerHTML = `
+    <div class="card rounded-2xl p-4 bg-white shadowMedium">
+      <div class="text-xs muted">Acréscimos encontrados</div>
+      <div class="text-2xl font-semibold mono">${totalAcresc}</div>
+      <div class="text-xs muted">${windowDays} dias de análise</div>
+    </div>
+    
+    <div class="card rounded-2xl p-4 bg-white shadowMedium">
+      <div class="text-xs muted">Reincidência pós-acréscimo</div>
+      <div class="text-2xl font-semibold mono">${totalReinc}</div>
+      <div class="text-xs muted">Casos detectados</div>
+    </div>
+    
+    <div class="card rounded-2xl p-4 bg-white shadowMedium">
+      <div class="text-xs muted">Clientes com reincidência</div>
+      <div class="text-2xl font-semibold mono">${clientesReinc}</div>
+      <div class="text-xs muted">Clientes únicos</div>
+    </div>
+    
+    <div class="card rounded-2xl p-4 bg-white shadowMedium">
+      <div class="text-xs muted">Taxa de reincidência</div>
+      <div class="text-2xl font-semibold mono">${taxaReinc}%</div>
+      <div class="text-xs muted">Do total de acréscimos</div>
+    </div>
+  `;
+  
+  // Renderizar casos
+  renderAcrescimosCases();
+}
+
+function renderAcrescimosCases() {
+  acrescCasesContainer.innerHTML = '';
+  
+  if (!acrescData.resultsByClient || acrescData.resultsByClient.length === 0) {
+    noAcrescMessage.classList.remove('hidden');
+    acrescCasesContainer.appendChild(noAcrescMessage);
+    return;
+  }
+  
+  noAcrescMessage.classList.add('hidden');
+  
+  // Renderizar cada cliente com casos
+  acrescData.resultsByClient.forEach(([cliente, cases], clientIndex) => {
+    const caseElement = createAcrescCaseElement(cliente, cases, clientIndex);
+    acrescCasesContainer.appendChild(caseElement);
+  });
+}
+
+function createAcrescCaseElement(cliente, cases, clientIndex) {
+  const caseDiv = document.createElement('div');
+  caseDiv.className = 'mb-3 card rounded-2xl p-4 acresc-case shadowMedium';
+  caseDiv.id = `acresc-case-${clientIndex}`;
+  
+  // Cabeçalho do caso
+  const header = document.createElement('div');
+  header.className = 'flex items-start justify-between cursor-pointer';
+  header.addEventListener('click', () => toggleAcrescDetails(clientIndex));
+  
+  // Contar casos por intervalo de dias
+  const casosCriticos = cases.filter(c => c.diasDiferenca <= 3).length;
+  const casosRapidos = cases.filter(c => c.diasDiferenca <= 7).length;
+  
+  header.innerHTML = `
+    <div class="flex-1">
+      <div class="flex items-center gap-2">
+        <div class="text-lg font-semibold">${escapeHtml(cliente)}</div>
+        <span class="px-2 py-1 rounded text-xs font-semibold bg-green-100 text-green-800">
+          ${cases.length} caso${cases.length > 1 ? 's' : ''}
+        </span>
+      </div>
+      <div class="text-xs muted mt-1">
+        ${cases.length} ocorrência${cases.length > 1 ? 's' : ''} de reincidência pós-acréscimo • 
+        ${casosCriticos} em ≤3 dias • ${casosRapidos} em ≤7 dias
+      </div>
+    </div>
+    <div class="text-2xl mono font-semibold ml-2">${cases.length}×</div>
+  `;
+  
+  caseDiv.appendChild(header);
+  
+  // Detalhes do caso (inicialmente ocultos)
+  const details = document.createElement('div');
+  details.className = 'alert-details mt-3';
+  details.id = `acresc-details-${clientIndex}`;
+  
+  // Resumo dos casos
+  const summaryDiv = document.createElement('div');
+  summaryDiv.className = 'grid grid-cols-1 md:grid-cols-3 gap-3 mb-3';
+  
+  // Calcular estatísticas
+  const avgDays = Math.round(cases.reduce((sum, c) => sum + c.diasDiferenca, 0) / cases.length);
+  const minDays = Math.min(...cases.map(c => c.diasDiferenca));
+  
+  summaryDiv.innerHTML = `
+    <div class="bg-white p-3 rounded-xl border shadowSoft">
+      <div class="text-xs muted">Estatísticas</div>
+      <div class="text-sm mt-1">
+        <div>Média: <span class="mono font-semibold">${avgDays} dias</span></div>
+        <div>Mínimo: <span class="mono font-semibold">${minDays} dias</span></div>
+        <div>Total acréscimos: <span class="mono font-semibold">${cases.reduce((sum, c) => sum + c.acrescimoValor, 0)}</span></div>
+      </div>
+    </div>
+    
+    <div class="bg-white p-3 rounded-xl border shadowSoft">
+      <div class="text-xs muted">Técnicos envolvidos</div>
+      <div class="text-sm mt-1">
+        ${uniqSorted([...cases.map(c => c.tecnicoAcresc), ...cases.map(c => c.tecnicoProximo)]).filter(Boolean).length > 0 
+          ? uniqSorted([...cases.map(c => c.tecnicoAcresc), ...cases.map(c => c.tecnicoProximo)]).filter(Boolean).map(t => `<div>${escapeHtml(t)}</div>`).join('')
+          : '<div class="text-muted">Nenhum técnico identificado</div>'}
+      </div>
+    </div>
+    
+    <div class="bg-white p-3 rounded-xl border shadowSoft">
+      <div class="text-xs muted">Tipos de chamado</div>
+      <div class="text-sm mt-1">
+        ${uniqSorted(cases.map(c => c.tipoProximo)).filter(Boolean).length > 0 
+          ? uniqSorted(cases.map(c => c.tipoProximo)).filter(Boolean).map(t => `<div>${escapeHtml(t)}</div>`).join('')
+          : '<div class="text-muted">Nenhum tipo identificado</div>'}
+      </div>
+    </div>
+  `;
+  
+  details.appendChild(summaryDiv);
+  
+  // Tabela de casos
+  const tableTitle = document.createElement('div');
+  tableTitle.className = 'text-sm font-semibold mb-2';
+  tableTitle.textContent = 'Detalhes dos casos (ordenados por intervalo crescente)';
+  details.appendChild(tableTitle);
+  
+  const tableContainer = document.createElement('div');
+  tableContainer.className = 'overflow-auto border rounded-xl shadowSoft';
+  
+  const table = document.createElement('table');
+  table.className = 'min-w-full text-sm';
+  
+  table.innerHTML = `
+    <thead class="bg-slate-100">
+      <tr class="text-left">
+        <th class="p-2">Δ Dias</th>
+        <th class="p-2">Data Acréc.</th>
+        <th class="p-2">Chamado Acréc.</th>
+        <th class="p-2">Data Próx.</th>
+        <th class="p-2">Chamado Próx.</th>
+        <th class="p-2">Tipo</th>
+        <th class="p-2">Motivo</th>
+        <th class="p-2">Ações</th>
+      </tr>
+    </thead>
+    <tbody id="acresc-table-${clientIndex}">
+      <!-- Linhas serão preenchidas abaixo -->
+    </tbody>
+  `;
+  
+  const tbody = table.querySelector(`#acresc-table-${clientIndex}`);
+  
+  // Ordenar casos por intervalo de dias (menor primeiro)
+  const sortedCases = [...cases].sort((a, b) => a.diasDiferenca - b.diasDiferenca);
+  
+  sortedCases.forEach((caseItem, index) => {
+    const diasClass = caseItem.diasDiferenca <= 3 ? 'text-red-600 font-bold' : 
+                     caseItem.diasDiferenca <= 7 ? 'text-orange-600 font-semibold' : 
+                     'text-blue-600';
+    
+    const tr = document.createElement('tr');
+    tr.className = 'border-t hover:bg-slate-50';
+    
+    tr.innerHTML = `
+      <td class="p-2 mono ${diasClass}">${caseItem.diasDiferenca}</td>
+      <td class="p-2 mono">${caseItem.dataAcresc}</td>
+      <td class="p-2 mono">
+        ${escapeHtml(caseItem.chamadoAcresc)}<br>
+        <span class="text-xs muted">${escapeHtml(caseItem.tecnicoAcresc)}</span><br>
+        <span class="text-xs">Acréc.: ${caseItem.acrescimoValor}</span>
+      </td>
+      <td class="p-2 mono">${caseItem.dataProximo}</td>
+      <td class="p-2 mono">
+        ${escapeHtml(caseItem.chamadoProximo)}<br>
+        <span class="text-xs muted">${escapeHtml(caseItem.tecnicoProximo)}</span>
+      </td>
+      <td class="p-2">${escapeHtml(caseItem.tipoProximo)}</td>
+      <td class="p-2 text-xs">${escapeHtml(caseItem.motivoProximo)}</td>
+      <td class="p-2">
+        <button class="btn px-2 py-1 rounded-lg bg-white text-xs shadowSoft" onclick="drillToAcrescimo('${escapeHtml(caseItem.cliente)}', '${caseItem.dataAcresc}', '${caseItem.dataProximo}')">
+          Detalhes
+        </button>
+      </td>
+    `;
+    
+    tbody.appendChild(tr);
+  });
+  
+  tableContainer.appendChild(table);
+  details.appendChild(tableContainer);
+  
+  // Detalhes de equipamentos
+  if (cases.some(c => c.equipamentosAcresc.length > 0 || c.equipamentosProximo.length > 0)) {
+    const equipTitle = document.createElement('div');
+    equipTitle.className = 'text-sm font-semibold mb-2 mt-3';
+    equipTitle.textContent = 'Equipamentos envolvidos';
+    details.appendChild(equipTitle);
+    
+    const equipContainer = document.createElement('div');
+    equipContainer.className = 'bg-white p-3 rounded-xl border shadowSoft';
+    
+    let equipHtml = '<div class="text-xs muted mb-2">Equipamentos em acréscimos vs próximos chamados:</div><div class="text-sm">';
+    
+    // Agrupar equipamentos únicos
+    const allEquipAcresc = new Set();
+    const allEquipProximo = new Set();
+    
+    cases.forEach(c => {
+      c.equipamentosAcresc.forEach(e => allEquipAcresc.add(e.split(' (')[0]));
+      c.equipamentosProximo.forEach(e => allEquipProximo.add(e.split(' (')[0]));
+    });
+    
+    if (allEquipAcresc.size > 0 || allEquipProximo.size > 0) {
+      equipHtml += '<div class="grid grid-cols-2 gap-4">';
+      equipHtml += '<div><div class="font-semibold text-xs muted">Nos acréscimos:</div>';
+      equipHtml += Array.from(allEquipAcresc).map(e => `<div class="truncate">${escapeHtml(e)}</div>`).join('');
+      equipHtml += '</div>';
+      equipHtml += '<div><div class="font-semibold text-xs muted">Nos próximos chamados:</div>';
+      equipHtml += Array.from(allEquipProximo).map(e => `<div class="truncate">${escapeHtml(e)}</div>`).join('');
+      equipHtml += '</div>';
+      equipHtml += '</div>';
+    } else {
+      equipHtml += '<div class="text-muted">Nenhum equipamento identificado</div>';
+    }
+    
+    equipHtml += '</div>';
+    equipContainer.innerHTML = equipHtml;
+    details.appendChild(equipContainer);
+  }
+  
+  // Ações
+  const actionsDiv = document.createElement('div');
+  actionsDiv.className = 'flex justify-between items-center mt-3 pt-3 border-t';
+  
+  const infoText = document.createElement('div');
+  infoText.className = 'text-xs muted';
+  infoText.textContent = `Este cliente teve ${cases.length} ocorrência(s) de reincidência após acréscimo. Considere revisar a qualidade do serviço ou equipamentos.`;
+  
+  const actionButtons = document.createElement('div');
+  actionButtons.className = 'flex gap-2';
+  
+  const filterBtn = document.createElement('button');
+  filterBtn.className = 'btn px-3 py-1.5 rounded-xl bg-white text-sm shadowSoft';
+  filterBtn.textContent = 'Filtrar este cliente';
+  filterBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    fCliente.value = cliente;
+    applyFilters();
+    showPage('acrescimos');
+  });
+  
+  const drillBtn = document.createElement('button');
+  drillBtn.className = 'btn px-3 py-1.5 rounded-xl bg-white text-sm shadowSoft';
+  drillBtn.textContent = 'Ver drill-down';
+  drillBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    openDrill('cliente', cliente);
+  });
+  
+  actionButtons.appendChild(filterBtn);
+  actionButtons.appendChild(drillBtn);
+  
+  actionsDiv.appendChild(infoText);
+  actionsDiv.appendChild(actionButtons);
+  details.appendChild(actionsDiv);
+  
+  caseDiv.appendChild(details);
+  
+  return caseDiv;
+}
+
+function toggleAcrescDetails(index) {
+  const details = el(`acresc-details-${index}`);
+  const caseDiv = el(`acresc-case-${index}`);
+  
+  if (details.classList.contains('open')) {
+    details.classList.remove('open');
+    caseDiv.classList.remove('expanded');
+  } else {
+    // Fechar outros casos abertos
+    document.querySelectorAll('.alert-details.open').forEach(el => {
+      el.classList.remove('open');
+      el.closest('.card').classList.remove('expanded');
+    });
+    
+    details.classList.add('open');
+    caseDiv.classList.add('expanded');
+  }
+}
+
+// Função para drill-down a partir da análise de acréscimos
+window.drillToAcrescimo = function(cliente, dataInicio, dataFim) {
+  fCliente.value = cliente;
+  fDe.value = dataInicio;
+  fAte.value = dataFim;
+  applyFilters();
+  showPage('registros');
+};
 
 /* =========================
    UI por módulo
@@ -1167,6 +1692,8 @@ function applyFilters(){
   page = 1;
   fillMonthsCheckboxes();
   renderAll();
+  renderAlerts();
+  analyzeAcrescimos();
 }
 
 /* =========================
@@ -1262,7 +1789,7 @@ function renderMonthlyKPIs(monthlyData) {
   
   monthlyData.forEach(data => {
     const div = document.createElement('div');
-    div.className = 'card rounded-2xl p-4 bg-white';
+    div.className = 'card rounded-2xl p-4 bg-white shadowMedium';
     div.innerHTML = `
       <div class="text-sm font-semibold">${data.month}</div>
       <div class="mt-2 space-y-1 text-sm">
@@ -1538,12 +2065,11 @@ function renderKPIs(){
     const cars = carSet.size || 0;
 
     const avgPerDay = daysWithData ? (total / daysWithData) : null;
-    const avgPerDayPerCar = (daysWithData && cars) ? (total / (daysWithData * cars)) : null;
     const estMonth = avgPerDay ? (avgPerDay * 30.42) : null;
 
     cards.push({t:"Chamados", v: total, s:"no recorte"});
     cards.push({t:"Maior fatia", v: topTipo, s:"mix de tipo"});
-    cards.push({t:"Média (dia / carro)", v: (avgPerDayPerCar===null?"—":avgPerDayPerCar.toFixed(2)), s: `${daysWithData||"—"} dia(s) • ${cars||"—"} carro(s)`});
+    cards.push({t:"Média (cham./dia)", v: (avgPerDay===null?"—":avgPerDay.toFixed(2)), s: `${daysWithData||"—"} dia(s) com dados`});
     cards.push({t:"Média (cham./mês)", v: (estMonth===null?"—":estMonth.toFixed(0)), s:"estimativa via média/dia"});
     cards.push({t:"Acréscimos", v: acresc, s:"soma do recorte"});
     cards.push({t:"Equip (qty)", v: equipS, s:"soma nas colunas detectadas"});
@@ -1565,7 +2091,7 @@ function renderKPIs(){
   kpiGrid.innerHTML = "";
   for (const c of cards){
     const div = document.createElement("div");
-    div.className = "card rounded-2xl p-4 bg-white";
+    div.className = "card rounded-2xl p-4 bg-white shadowMedium";
     div.innerHTML = `
       <div class="text-xs muted">${escapeHtml(c.t)}</div>
       <div class="text-2xl font-semibold mono kpiVal">${escapeHtml(c.v)}</div>
@@ -1644,12 +2170,12 @@ function renderDominantEquip(){
         <div class="text-lg font-semibold">Pergunta de reunião: "A maior fatia foi ${escapeHtml(dominantTipo)}. Qual equipamento liderou?"</div>
         <div class="text-xs muted">Ranking por qty nas colunas de equipamento (no recorte atual, ignorando o filtro de tipo).</div>
       </div>
-      <div class="chip rounded-xl px-3 py-2 bg-slate-50 text-xs">
+      <div class="chip rounded-xl px-3 py-2 bg-slate-50 text-xs shadowSoft">
         <span class="muted">Líder:</span> <span class="mono font-semibold">${escapeHtml(leader)}</span>
       </div>
     </div>
 
-    <div class="mt-3 overflow-auto border rounded-2xl">
+    <div class="mt-3 overflow-auto border rounded-2xl shadowSoft">
       <table class="min-w-full text-sm bg-white">
         <thead class="bg-slate-100">
           <tr class="text-left">
@@ -1773,36 +2299,36 @@ function renderEquipHealth(){
       </div>
       <div class="flex items-center gap-2 flex-wrap">
         <span class="text-xs muted">Equipamento:</span>
-        <select id="healthEquipSel" class="btn px-3 py-2 rounded-xl bg-white text-sm">
+        <select id="healthEquipSel" class="btn px-3 py-2 rounded-xl bg-white text-sm shadowSoft">
           ${equipColumns.map(c=>`<option value="${escapeHtml(c)}" ${c===selected?"selected":""}>${escapeHtml(c)}</option>`).join("")}
         </select>
       </div>
     </div>
 
     <div class="grid grid-cols-1 md:grid-cols-4 gap-3 mt-4">
-      <div class="card rounded-2xl p-3 bg-slate-50">
+      <div class="card rounded-2xl p-3 bg-slate-50 shadowSoft">
         <div class="text-xs muted">Manutenção (qty)</div>
         <div class="text-2xl font-semibold mono">${maintTotal}</div>
       </div>
-      <div class="card rounded-2xl p-3 bg-slate-50">
+      <div class="card rounded-2xl p-3 bg-slate-50 shadowSoft">
         <div class="text-xs muted">Gap médio (dias)</div>
         <div class="text-2xl font-semibold mono">${avgGapGlobal===null?"—":avgGapGlobal}</div>
       </div>
-      <div class="card rounded-2xl p-3 bg-slate-50">
+      <div class="card rounded-2xl p-3 bg-slate-50 shadowSoft">
         <div class="text-xs muted">Pós-montagem (até ${win}d)</div>
         <div class="text-2xl font-semibold mono">${flaggedCount}</div>
       </div>
-      <div class="card rounded-xl p-3 bg-slate-50">
+      <div class="card rounded-xl p-3 bg-slate-50 shadowSoft">
         <div class="text-xs muted">% pós-montagem</div>
         <div class="text-2xl font-semibold mono">${montCount?`${pct}%`:"—"}</div>
       </div>
     </div>
 
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-3 mt-3">
-      <div class="card rounded-2xl p-3 bg-white">
+      <div class="card rounded-2xl p-3 bg-white shadowMedium">
         <div class="text-sm font-semibold">Top equipamentos por manutenção (qty)</div>
         <div class="text-xs muted">Base: recorte atual (filtros), tipo=Manutenção</div>
-        <div class="mt-2 overflow-auto border rounded-2xl max-h-72">
+        <div class="mt-2 overflow-auto border rounded-2xl max-h-72 shadowSoft">
           <table class="min-w-full text-sm">
             <thead class="bg-slate-100 sticky top-0">
               <tr class="text-left"><th class="p-2">Equipamento</th><th class="p-2">Qty</th></tr>
@@ -1819,10 +2345,10 @@ function renderEquipHealth(){
         </div>
       </div>
 
-      <div class="card rounded-2xl p-3 bg-white">
+      <div class="card rounded-2xl p-3 bg-white shadowMedium">
         <div class="text-sm font-semibold">Casos: Montagem → Manutenção (até ${win} dias)</div>
         <div class="text-xs muted">Chave: base + cliente + coluna de equipamento (sem serial/patrimônio).</div>
-        <div class="mt-2 overflow-auto border rounded-2xl max-h-72">
+        <div class="mt-2 overflow-auto border rounded-2xl max-h-72 shadowSoft">
           <table class="min-w-full text-sm">
             <thead class="bg-slate-100 sticky top-0">
               <tr class="text-left">
@@ -2289,6 +2815,7 @@ function showPage(pageKey){
 
   if (pageKey==="comparativo") renderMonthlyComparison();
   if (pageKey==="alertas") renderAlerts();
+  if (pageKey==="acrescimos") analyzeAcrescimos();
 }
 navBtns.forEach(btn=>{
   btn.addEventListener("click", ()=>showPage(btn.getAttribute("data-page")));
@@ -2378,6 +2905,12 @@ fSearch.addEventListener("input", debounce(applyFilters, 300));
 alertDias.addEventListener("change", renderAlerts);
 alertMinManut.addEventListener("change", renderAlerts);
 btnRefreshAlerts.addEventListener("click", renderAlerts);
+
+// Eventos de acréscimos
+acrescWindowDays.addEventListener("change", analyzeAcrescimos);
+acrescTipo.addEventListener("change", analyzeAcrescimos);
+acrescCliente.addEventListener("input", debounce(analyzeAcrescimos, 300));
+btnRefreshAcresc.addEventListener("click", analyzeAcrescimos);
 
 healthWindowDays.addEventListener("change", renderEquipHealth);
 
