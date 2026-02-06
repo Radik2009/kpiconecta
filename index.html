@@ -32,10 +32,6 @@
     .alert-expanded { background-color: #f8fafc; }
     .alert-details { max-height: 0; overflow: hidden; transition: max-height 0.3s ease-out; }
     .alert-details.open { max-height: 500px; }
-    
-    /* Estilos para acréscimos */
-    .acresc-case { border-left: 4px solid #10b981; background-color: #f0fdf4; }
-    .acresc-case.expanded { background-color: #f8fafc; }
   </style>
 </head>
 
@@ -484,12 +480,30 @@
             <!-- Será preenchido dinamicamente -->
           </div>
 
-          <!-- Casos de reincidência -->
-          <div id="acrescCasesContainer" class="space-y-3">
-            <div class="text-sm muted text-center p-4" id="noAcrescMessage">
-              Nenhum caso de reincidência pós-acréscimo encontrado. Ajuste os critérios ou carregue mais dados.
+          <!-- Análise detalhada -->
+          <div class="card rounded-2xl p-4 bg-white shadowMedium">
+            <div class="text-sm font-semibold mb-2">Casos de reincidência pós-acréscimo</div>
+            <div class="text-xs muted mb-3">Clientes que tiveram acréscimo e depois outro chamado dentro do período configurado.</div>
+            
+            <div class="overflow-auto border rounded-xl shadowSoft">
+              <table class="min-w-full text-sm">
+                <thead class="bg-slate-100">
+                  <tr class="text-left">
+                    <th class="p-2">Cliente</th>
+                    <th class="p-2">Data acréscimo</th>
+                    <th class="p-2">Chamado com acrésc.</th>
+                    <th class="p-2">Próximo chamado</th>
+                    <th class="p-2">Δ dias</th>
+                    <th class="p-2">Tipo</th>
+                    <th class="p-2">Motivo</th>
+                    <th class="p-2">Ações</th>
+                  </tr>
+                </thead>
+                <tbody id="acrescTableBody">
+                  <!-- Será preenchido dinamicamente -->
+                </tbody>
+              </table>
             </div>
-            <!-- Casos serão inseridos aqui -->
           </div>
         </div>
       </section>
@@ -628,7 +642,10 @@ let pageSize = 50;
 let healthSelectedCol = null;
 let selectedMonths = new Set();
 let alertsData = [];
-let acrescData = [];
+
+let chart1, chart2, chart3, chart4;
+let compareChart1, compareChart2;
+let dChart;
 
 /* =========================
    ELEMENTOS
@@ -705,8 +722,7 @@ const acrescWindowDays = el("acrescWindowDays");
 const acrescTipo = el("acrescTipo");
 const acrescCliente = el("acrescCliente");
 const acrescSummary = el("acrescSummary");
-const acrescCasesContainer = el("acrescCasesContainer");
-const noAcrescMessage = el("noAcrescMessage");
+const acrescTableBody = el("acrescTableBody");
 
 // Drill
 const drillModal = el("drillModal");
@@ -1130,7 +1146,7 @@ function createAlertElement(alert, index) {
   tableContainer.appendChild(table);
   details.appendChild(tableContainer);
   
-  // Ações
+  // Ações - ADICIONADO BOTÃO IMPRIMIR
   const actionsDiv = document.createElement('div');
   actionsDiv.className = 'flex justify-between items-center mt-3 pt-3 border-t';
   
@@ -1159,8 +1175,18 @@ function createAlertElement(alert, index) {
     openDrill('cliente', alert.cliente);
   });
   
+  // NOVO BOTÃO IMPRIMIR
+  const printBtn = document.createElement('button');
+  printBtn.className = 'btn btnPrimary px-3 py-1.5 rounded-xl text-white text-sm shadowSoft';
+  printBtn.innerHTML = '<svg class="w-4 h-4 inline mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path></svg> Imprimir';
+  printBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    printAlert(alert);
+  });
+  
   actionButtons.appendChild(filterBtn);
   actionButtons.appendChild(drillBtn);
+  actionButtons.appendChild(printBtn);
   
   actionsDiv.appendChild(infoText);
   actionsDiv.appendChild(actionButtons);
@@ -1169,6 +1195,142 @@ function createAlertElement(alert, index) {
   alertDiv.appendChild(details);
   
   return alertDiv;
+}
+
+// FUNÇÃO PARA IMPRIMIR ALERTA
+function printAlert(alert) {
+  const printWindow = window.open('', '_blank', 'width=800,height=600');
+  printWindow.document.write(`
+    <!DOCTYPE html>
+    <html lang="pt-BR">
+    <head>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <title>Relatório de Alerta - ${escapeHtml(alert.cliente)}</title>
+      <style>
+        body { font-family: Arial, sans-serif; margin: 20px; color: #333; }
+        .header { border-bottom: 2px solid #333; padding-bottom: 10px; margin-bottom: 20px; }
+        .title { font-size: 24px; font-weight: bold; margin-bottom: 5px; }
+        .subtitle { font-size: 14px; color: #666; }
+        .section { margin-bottom: 20px; }
+        .section-title { font-size: 18px; font-weight: bold; border-bottom: 1px solid #ccc; padding-bottom: 5px; margin-bottom: 10px; }
+        .info-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-bottom: 15px; }
+        .info-item { display: flex; justify-content: space-between; border-bottom: 1px dashed #eee; padding: 5px 0; }
+        .label { font-weight: bold; }
+        .table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        .table th { background-color: #f0f0f0; text-align: left; padding: 8px; border: 1px solid #ddd; }
+        .table td { padding: 8px; border: 1px solid #ddd; }
+        .severity-high { color: #dc2626; font-weight: bold; }
+        .severity-medium { color: #d97706; font-weight: bold; }
+        .severity-low { color: #2563eb; font-weight: bold; }
+        .footer { margin-top: 30px; font-size: 12px; color: #666; text-align: center; }
+      </style>
+    </head>
+    <body>
+      <div class="header">
+        <div class="title">Relatório de Alerta - Cliente Problemático</div>
+        <div class="subtitle">Smart Conecta • Portal Operacional & RH • ${new Date().toLocaleDateString('pt-BR')}</div>
+      </div>
+      
+      <div class="section">
+        <div class="section-title">Informações do Cliente</div>
+        <div class="info-grid">
+          <div class="info-item">
+            <span class="label">Cliente:</span>
+            <span>${escapeHtml(alert.cliente)}</span>
+          </div>
+          <div class="info-item">
+            <span class="label">Criticidade:</span>
+            <span class="severity-${alert.severity}">${alert.severity === 'high' ? 'ALTA' : alert.severity === 'medium' ? 'MÉDIA' : 'BAIXA'}</span>
+          </div>
+          <div class="info-item">
+            <span class="label">Total de Manutenções:</span>
+            <span>${alert.totalManut}</span>
+          </div>
+          <div class="info-item">
+            <span class="label">Manutenções em ${alert.windowDays} dias:</span>
+            <span>${alert.maxInWindow}</span>
+          </div>
+          <div class="info-item">
+            <span class="label">Período de Análise:</span>
+            <span>${alert.windowStart || 'N/A'}</span>
+          </div>
+          <div class="info-item">
+            <span class="label">Data do Relatório:</span>
+            <span>${new Date().toLocaleDateString('pt-BR')}</span>
+          </div>
+        </div>
+      </div>
+      
+      <div class="section">
+        <div class="section-title">Equipamentos Envolvidos</div>
+        <div>${alert.equipamentos.length > 0 ? alert.equipamentos.map(e => escapeHtml(e)).join(', ') : 'Nenhum equipamento identificado'}</div>
+      </div>
+      
+      <div class="section">
+        <div class="section-title">Técnicos Envolvidos</div>
+        <div>${alert.tecnicos.length > 0 ? alert.tecnicos.map(t => escapeHtml(t)).join(', ') : 'Nenhum técnico identificado'}</div>
+      </div>
+      
+      <div class="section">
+        <div class="section-title">Motivos Mais Comuns</div>
+        <ul>
+          ${alert.topMotivos.map(([motivo, count]) => `<li>${escapeHtml(motivo)} (${count} ocorrências)</li>`).join('')}
+        </ul>
+      </div>
+      
+      <div class="section">
+        <div class="section-title">Registros de Manutenção</div>
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Data</th>
+              <th>Chamado</th>
+              <th>Técnico</th>
+              <th>Acrésc.</th>
+              <th>Motivo</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${alert.records.slice(0, 15).map(record => `
+              <tr>
+                <td>${record.data || ''}</td>
+                <td>${escapeHtml(record.chamado)}</td>
+                <td>${escapeHtml(record.tecnico)}</td>
+                <td>${record.acrescimo || 0}</td>
+                <td>${escapeHtml(record.motivo)}</td>
+              </tr>
+            `).join('')}
+            ${alert.records.length > 15 ? `<tr><td colspan="5" style="text-align: center; font-style: italic;">... e mais ${alert.records.length - 15} registro(s)</td></tr>` : ''}
+          </tbody>
+        </table>
+      </div>
+      
+      <div class="section">
+        <div class="section-title">Recomendações</div>
+        <p>Este cliente apresenta múltiplas manutenções em um período curto (${alert.maxInWindow} manutenções em ${alert.windowDays} dias). Recomenda-se:</p>
+        <ul>
+          <li>Visita técnica para verificação geral dos equipamentos</li>
+          <li>Avaliação da necessidade de substituição de equipamentos problemáticos</li>
+          <li>Treinamento do cliente sobre uso e manutenção preventiva</li>
+          <li>Acompanhamento especial nas próximas semanas</li>
+        </ul>
+      </div>
+      
+      <div class="footer">
+        <p>Relatório gerado automaticamente pelo Portal Operacional & RH - Smart Conecta</p>
+        <p>Data de geração: ${new Date().toLocaleString('pt-BR')}</p>
+      </div>
+      
+      <script>
+        window.onload = function() {
+          window.print();
+        };
+      <\/script>
+    </body>
+    </html>
+  `);
+  printWindow.document.close();
 }
 
 function toggleAlertDetails(index) {
@@ -1191,7 +1353,7 @@ function toggleAlertDetails(index) {
 }
 
 /* =========================
-   ANÁLISE DE ACRÉSCIMOS - NOVA VERSÃO COM EXPANSÃO
+   ANÁLISE DE ACRÉSCIMOS
 ========================= */
 function analyzeAcrescimos() {
   const windowDays = Math.max(1, toInt(acrescWindowDays.value));
@@ -1227,10 +1389,8 @@ function analyzeAcrescimos() {
       </div>
     `;
     
-    acrescCasesContainer.innerHTML = `
-      <div class="text-sm muted text-center p-4" id="noAcrescMessage">
-        Nenhum caso de reincidência pós-acréscimo encontrado. Ajuste os critérios ou carregue mais dados.
-      </div>
+    acrescTableBody.innerHTML = `
+      <tr><td colspan="8" class="p-4 text-center muted">Nenhum acréscimo encontrado no período atual.</td></tr>
     `;
     return;
   }
@@ -1276,18 +1436,6 @@ function analyzeAcrescimos() {
       const daysDiff = daysBetween(current.data, nextRecord.data);
       
       if (daysDiff !== null && daysDiff <= windowDays) {
-        // Buscar equipamentos envolvidos
-        const equipamentosAcresc = [];
-        const equipamentosProximo = [];
-        
-        for (const col of equipColumns) {
-          const qtyAcresc = toInt((current._raw||{})[col]);
-          const qtyProximo = toInt((nextRecord._raw||{})[col]);
-          
-          if (qtyAcresc > 0) equipamentosAcresc.push(`${col} (${qtyAcresc})`);
-          if (qtyProximo > 0) equipamentosProximo.push(`${col} (${qtyProximo})`);
-        }
-        
         results.push({
           cliente,
           dataAcresc: current.data,
@@ -1295,17 +1443,12 @@ function analyzeAcrescimos() {
           tecnicoAcresc: current.tecnico,
           motivoAcresc: current.motivo,
           acrescimoValor: current.acrescimo || 0,
-          equipamentosAcresc,
           dataProximo: nextRecord.data,
           chamadoProximo: nextRecord.chamado,
           tecnicoProximo: nextRecord.tecnico,
           tipoProximo: nextRecord.tipo,
           motivoProximo: nextRecord.motivo,
-          equipamentosProximo,
-          diasDiferenca: daysDiff,
-          // Manter os registros originais para detalhes
-          recordAcresc: current,
-          recordProximo: nextRecord
+          diasDiferenca: daysDiff
         });
         
         clientesComReincidencia.add(cliente);
@@ -1313,25 +1456,8 @@ function analyzeAcrescimos() {
     }
   }
   
-  // Agrupar resultados por cliente para exibição
-  const resultsByClient = new Map();
-  results.forEach(result => {
-    const key = result.cliente;
-    if (!resultsByClient.has(key)) resultsByClient.set(key, []);
-    resultsByClient.get(key).push(result);
-  });
-  
-  // Ordenar por cliente e depois por diferença de dias
-  const sortedClients = Array.from(resultsByClient.entries()).sort((a, b) => {
-    // Primeiro ordena pelo número de casos (mais casos primeiro)
-    if (b[1].length !== a[1].length) return b[1].length - a[1].length;
-    // Depois ordena pelo menor intervalo de dias
-    const minA = Math.min(...a[1].map(r => r.diasDiferenca));
-    const minB = Math.min(...b[1].map(r => r.diasDiferenca));
-    return minA - minB;
-  });
-  
-  acrescData = { results, resultsByClient: sortedClients };
+  // Ordenar por diferença de dias (menor primeiro)
+  results.sort((a, b) => a.diasDiferenca - b.diasDiferenca);
   
   // Atualizar KPIs
   const totalAcresc = recordsWithAcresc.length;
@@ -1365,278 +1491,51 @@ function analyzeAcrescimos() {
     </div>
   `;
   
-  // Renderizar casos
-  renderAcrescimosCases();
-}
-
-function renderAcrescimosCases() {
-  acrescCasesContainer.innerHTML = '';
+  // Atualizar tabela
+  acrescTableBody.innerHTML = '';
   
-  if (!acrescData.resultsByClient || acrescData.resultsByClient.length === 0) {
-    noAcrescMessage.classList.remove('hidden');
-    acrescCasesContainer.appendChild(noAcrescMessage);
+  if (results.length === 0) {
+    acrescTableBody.innerHTML = `
+      <tr><td colspan="8" class="p-4 text-center muted">Nenhum caso de reincidência pós-acréscimo encontrado com os critérios atuais.</td></tr>
+    `;
     return;
   }
   
-  noAcrescMessage.classList.add('hidden');
-  
-  // Renderizar cada cliente com casos
-  acrescData.resultsByClient.forEach(([cliente, cases], clientIndex) => {
-    const caseElement = createAcrescCaseElement(cliente, cases, clientIndex);
-    acrescCasesContainer.appendChild(caseElement);
-  });
-}
-
-function createAcrescCaseElement(cliente, cases, clientIndex) {
-  const caseDiv = document.createElement('div');
-  caseDiv.className = 'mb-3 card rounded-2xl p-4 acresc-case shadowMedium';
-  caseDiv.id = `acresc-case-${clientIndex}`;
-  
-  // Cabeçalho do caso
-  const header = document.createElement('div');
-  header.className = 'flex items-start justify-between cursor-pointer';
-  header.addEventListener('click', () => toggleAcrescDetails(clientIndex));
-  
-  // Contar casos por intervalo de dias
-  const casosCriticos = cases.filter(c => c.diasDiferenca <= 3).length;
-  const casosRapidos = cases.filter(c => c.diasDiferenca <= 7).length;
-  
-  header.innerHTML = `
-    <div class="flex-1">
-      <div class="flex items-center gap-2">
-        <div class="text-lg font-semibold">${escapeHtml(cliente)}</div>
-        <span class="px-2 py-1 rounded text-xs font-semibold bg-green-100 text-green-800">
-          ${cases.length} caso${cases.length > 1 ? 's' : ''}
-        </span>
-      </div>
-      <div class="text-xs muted mt-1">
-        ${cases.length} ocorrência${cases.length > 1 ? 's' : ''} de reincidência pós-acréscimo • 
-        ${casosCriticos} em ≤3 dias • ${casosRapidos} em ≤7 dias
-      </div>
-    </div>
-    <div class="text-2xl mono font-semibold ml-2">${cases.length}×</div>
-  `;
-  
-  caseDiv.appendChild(header);
-  
-  // Detalhes do caso (inicialmente ocultos)
-  const details = document.createElement('div');
-  details.className = 'alert-details mt-3';
-  details.id = `acresc-details-${clientIndex}`;
-  
-  // Resumo dos casos
-  const summaryDiv = document.createElement('div');
-  summaryDiv.className = 'grid grid-cols-1 md:grid-cols-3 gap-3 mb-3';
-  
-  // Calcular estatísticas
-  const avgDays = Math.round(cases.reduce((sum, c) => sum + c.diasDiferenca, 0) / cases.length);
-  const minDays = Math.min(...cases.map(c => c.diasDiferenca));
-  
-  summaryDiv.innerHTML = `
-    <div class="bg-white p-3 rounded-xl border shadowSoft">
-      <div class="text-xs muted">Estatísticas</div>
-      <div class="text-sm mt-1">
-        <div>Média: <span class="mono font-semibold">${avgDays} dias</span></div>
-        <div>Mínimo: <span class="mono font-semibold">${minDays} dias</span></div>
-        <div>Total acréscimos: <span class="mono font-semibold">${cases.reduce((sum, c) => sum + c.acrescimoValor, 0)}</span></div>
-      </div>
-    </div>
-    
-    <div class="bg-white p-3 rounded-xl border shadowSoft">
-      <div class="text-xs muted">Técnicos envolvidos</div>
-      <div class="text-sm mt-1">
-        ${uniqSorted([...cases.map(c => c.tecnicoAcresc), ...cases.map(c => c.tecnicoProximo)]).filter(Boolean).length > 0 
-          ? uniqSorted([...cases.map(c => c.tecnicoAcresc), ...cases.map(c => c.tecnicoProximo)]).filter(Boolean).map(t => `<div>${escapeHtml(t)}</div>`).join('')
-          : '<div class="text-muted">Nenhum técnico identificado</div>'}
-      </div>
-    </div>
-    
-    <div class="bg-white p-3 rounded-xl border shadowSoft">
-      <div class="text-xs muted">Tipos de chamado</div>
-      <div class="text-sm mt-1">
-        ${uniqSorted(cases.map(c => c.tipoProximo)).filter(Boolean).length > 0 
-          ? uniqSorted(cases.map(c => c.tipoProximo)).filter(Boolean).map(t => `<div>${escapeHtml(t)}</div>`).join('')
-          : '<div class="text-muted">Nenhum tipo identificado</div>'}
-      </div>
-    </div>
-  `;
-  
-  details.appendChild(summaryDiv);
-  
-  // Tabela de casos
-  const tableTitle = document.createElement('div');
-  tableTitle.className = 'text-sm font-semibold mb-2';
-  tableTitle.textContent = 'Detalhes dos casos (ordenados por intervalo crescente)';
-  details.appendChild(tableTitle);
-  
-  const tableContainer = document.createElement('div');
-  tableContainer.className = 'overflow-auto border rounded-xl shadowSoft';
-  
-  const table = document.createElement('table');
-  table.className = 'min-w-full text-sm';
-  
-  table.innerHTML = `
-    <thead class="bg-slate-100">
-      <tr class="text-left">
-        <th class="p-2">Δ Dias</th>
-        <th class="p-2">Data Acréc.</th>
-        <th class="p-2">Chamado Acréc.</th>
-        <th class="p-2">Data Próx.</th>
-        <th class="p-2">Chamado Próx.</th>
-        <th class="p-2">Tipo</th>
-        <th class="p-2">Motivo</th>
-        <th class="p-2">Ações</th>
-      </tr>
-    </thead>
-    <tbody id="acresc-table-${clientIndex}">
-      <!-- Linhas serão preenchidas abaixo -->
-    </tbody>
-  `;
-  
-  const tbody = table.querySelector(`#acresc-table-${clientIndex}`);
-  
-  // Ordenar casos por intervalo de dias (menor primeiro)
-  const sortedCases = [...cases].sort((a, b) => a.diasDiferenca - b.diasDiferenca);
-  
-  sortedCases.forEach((caseItem, index) => {
-    const diasClass = caseItem.diasDiferenca <= 3 ? 'text-red-600 font-bold' : 
-                     caseItem.diasDiferenca <= 7 ? 'text-orange-600 font-semibold' : 
-                     'text-blue-600';
-    
+  results.forEach(result => {
     const tr = document.createElement('tr');
     tr.className = 'border-t hover:bg-slate-50';
     
+    const diasClass = result.diasDiferenca <= 3 ? 'text-red-600 font-bold' : 
+                      result.diasDiferenca <= 7 ? 'text-orange-600 font-semibold' : 
+                      'text-blue-600';
+    
     tr.innerHTML = `
-      <td class="p-2 mono ${diasClass}">${caseItem.diasDiferenca}</td>
-      <td class="p-2 mono">${caseItem.dataAcresc}</td>
-      <td class="p-2 mono">
-        ${escapeHtml(caseItem.chamadoAcresc)}<br>
-        <span class="text-xs muted">${escapeHtml(caseItem.tecnicoAcresc)}</span><br>
-        <span class="text-xs">Acréc.: ${caseItem.acrescimoValor}</span>
-      </td>
-      <td class="p-2 mono">${caseItem.dataProximo}</td>
-      <td class="p-2 mono">
-        ${escapeHtml(caseItem.chamadoProximo)}<br>
-        <span class="text-xs muted">${escapeHtml(caseItem.tecnicoProximo)}</span>
-      </td>
-      <td class="p-2">${escapeHtml(caseItem.tipoProximo)}</td>
-      <td class="p-2 text-xs">${escapeHtml(caseItem.motivoProximo)}</td>
+      <td class="p-2">${escapeHtml(result.cliente)}</td>
+      <td class="p-2 mono">${result.dataAcresc}</td>
+      <td class="p-2 mono">${escapeHtml(result.chamadoAcresc)}<br><span class="text-xs muted">${escapeHtml(result.tecnicoAcresc)}</span></td>
+      <td class="p-2 mono">${escapeHtml(result.chamadoProximo)}<br><span class="text-xs muted">${escapeHtml(result.tecnicoProximo)}</span></td>
+      <td class="p-2 mono ${diasClass}">${result.diasDiferenca} dias</td>
+      <td class="p-2">${escapeHtml(result.tipoProximo)}</td>
+      <td class="p-2 text-xs">${escapeHtml(result.motivoProximo)}</td>
       <td class="p-2">
-        <button class="btn px-2 py-1 rounded-lg bg-white text-xs shadowSoft" onclick="drillToAcrescimo('${escapeHtml(caseItem.cliente)}', '${caseItem.dataAcresc}', '${caseItem.dataProximo}')">
+        <button class="btn px-2 py-1 rounded-lg bg-white text-xs shadowSoft" onclick="drillToRegistro('${escapeHtml(result.cliente)}', '${result.dataAcresc}')">
           Detalhes
         </button>
       </td>
     `;
     
-    tbody.appendChild(tr);
+    acrescTableBody.appendChild(tr);
   });
-  
-  tableContainer.appendChild(table);
-  details.appendChild(tableContainer);
-  
-  // Detalhes de equipamentos
-  if (cases.some(c => c.equipamentosAcresc.length > 0 || c.equipamentosProximo.length > 0)) {
-    const equipTitle = document.createElement('div');
-    equipTitle.className = 'text-sm font-semibold mb-2 mt-3';
-    equipTitle.textContent = 'Equipamentos envolvidos';
-    details.appendChild(equipTitle);
-    
-    const equipContainer = document.createElement('div');
-    equipContainer.className = 'bg-white p-3 rounded-xl border shadowSoft';
-    
-    let equipHtml = '<div class="text-xs muted mb-2">Equipamentos em acréscimos vs próximos chamados:</div><div class="text-sm">';
-    
-    // Agrupar equipamentos únicos
-    const allEquipAcresc = new Set();
-    const allEquipProximo = new Set();
-    
-    cases.forEach(c => {
-      c.equipamentosAcresc.forEach(e => allEquipAcresc.add(e.split(' (')[0]));
-      c.equipamentosProximo.forEach(e => allEquipProximo.add(e.split(' (')[0]));
-    });
-    
-    if (allEquipAcresc.size > 0 || allEquipProximo.size > 0) {
-      equipHtml += '<div class="grid grid-cols-2 gap-4">';
-      equipHtml += '<div><div class="font-semibold text-xs muted">Nos acréscimos:</div>';
-      equipHtml += Array.from(allEquipAcresc).map(e => `<div class="truncate">${escapeHtml(e)}</div>`).join('');
-      equipHtml += '</div>';
-      equipHtml += '<div><div class="font-semibold text-xs muted">Nos próximos chamados:</div>';
-      equipHtml += Array.from(allEquipProximo).map(e => `<div class="truncate">${escapeHtml(e)}</div>`).join('');
-      equipHtml += '</div>';
-      equipHtml += '</div>';
-    } else {
-      equipHtml += '<div class="text-muted">Nenhum equipamento identificado</div>';
-    }
-    
-    equipHtml += '</div>';
-    equipContainer.innerHTML = equipHtml;
-    details.appendChild(equipContainer);
-  }
-  
-  // Ações
-  const actionsDiv = document.createElement('div');
-  actionsDiv.className = 'flex justify-between items-center mt-3 pt-3 border-t';
-  
-  const infoText = document.createElement('div');
-  infoText.className = 'text-xs muted';
-  infoText.textContent = `Este cliente teve ${cases.length} ocorrência(s) de reincidência após acréscimo. Considere revisar a qualidade do serviço ou equipamentos.`;
-  
-  const actionButtons = document.createElement('div');
-  actionButtons.className = 'flex gap-2';
-  
-  const filterBtn = document.createElement('button');
-  filterBtn.className = 'btn px-3 py-1.5 rounded-xl bg-white text-sm shadowSoft';
-  filterBtn.textContent = 'Filtrar este cliente';
-  filterBtn.addEventListener('click', (e) => {
-    e.stopPropagation();
-    fCliente.value = cliente;
-    applyFilters();
-    showPage('acrescimos');
-  });
-  
-  const drillBtn = document.createElement('button');
-  drillBtn.className = 'btn px-3 py-1.5 rounded-xl bg-white text-sm shadowSoft';
-  drillBtn.textContent = 'Ver drill-down';
-  drillBtn.addEventListener('click', (e) => {
-    e.stopPropagation();
-    openDrill('cliente', cliente);
-  });
-  
-  actionButtons.appendChild(filterBtn);
-  actionButtons.appendChild(drillBtn);
-  
-  actionsDiv.appendChild(infoText);
-  actionsDiv.appendChild(actionButtons);
-  details.appendChild(actionsDiv);
-  
-  caseDiv.appendChild(details);
-  
-  return caseDiv;
 }
 
-function toggleAcrescDetails(index) {
-  const details = el(`acresc-details-${index}`);
-  const caseDiv = el(`acresc-case-${index}`);
-  
-  if (details.classList.contains('open')) {
-    details.classList.remove('open');
-    caseDiv.classList.remove('expanded');
-  } else {
-    // Fechar outros casos abertos
-    document.querySelectorAll('.alert-details.open').forEach(el => {
-      el.classList.remove('open');
-      el.closest('.card').classList.remove('expanded');
-    });
-    
-    details.classList.add('open');
-    caseDiv.classList.add('expanded');
-  }
-}
-
-// Função para drill-down a partir da análise de acréscimos
-window.drillToAcrescimo = function(cliente, dataInicio, dataFim) {
+// Função para drill-down a partir da tabela de acréscimos
+window.drillToRegistro = function(cliente, data) {
   fCliente.value = cliente;
-  fDe.value = dataInicio;
+  fDe.value = data;
+  // Calcular data final (7 dias após)
+  const dataObj = new Date(data + 'T00:00:00Z');
+  dataObj.setDate(dataObj.getDate() + 7);
+  const dataFim = dataObj.toISOString().slice(0, 10);
   fAte.value = dataFim;
   applyFilters();
   showPage('registros');
