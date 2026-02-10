@@ -32,6 +32,28 @@
     .alert-expanded { background-color: #f8fafc; }
     .alert-details { max-height: 0; overflow: hidden; transition: max-height 0.3s ease-out; }
     .alert-details.open { max-height: 500px; }
+    
+    /* Estilos para análise mensal */
+    .month-analysis { border-left: 4px solid #10b981; }
+    .trend-up { color: #10b981; }
+    .trend-down { color: #ef4444; }
+    .trend-neutral { color: #6b7280; }
+    
+    /* Estilos para impressão */
+    @media print {
+      body * {
+        visibility: hidden;
+      }
+      #printableAlerts, #printableAlerts * {
+        visibility: visible;
+      }
+      #printableAlerts {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 100%;
+      }
+    }
   </style>
 </head>
 
@@ -286,54 +308,64 @@
         <div id="page-comparativo" class="hidden glass shadowMedium card rounded-2xl p-4">
           <div class="flex items-start justify-between flex-wrap gap-3">
             <div>
-              <div class="text-lg font-semibold">Comparação mensal</div>
-              <div class="text-xs muted">Selecione os meses para comparar. Gráficos mostram apenas Montagem, Manutenção, Retirada, Troca e Revisão.</div>
+              <div class="text-lg font-semibold">Comparação mensal - Análise Detalhada</div>
+              <div class="text-xs muted">Selecione um mês para análise detalhada ou múltiplos meses para comparação.</div>
             </div>
           </div>
 
           <!-- Seletor de meses -->
           <div class="mt-4 card rounded-2xl p-3 bg-white shadowMedium">
-            <div class="text-sm font-semibold">Selecione os meses para comparar</div>
-            <div class="text-xs muted mt-1">Clique nos meses que deseja incluir na análise</div>
+            <div class="text-sm font-semibold">Selecione os meses para análise</div>
+            <div class="text-xs muted mt-1">Clique nos meses que deseja incluir na análise. Selecione apenas um para análise detalhada.</div>
             <div id="monthsCheckboxContainer" class="mt-3 flex flex-wrap gap-2"></div>
+            <div class="mt-2 text-xs muted">
+              <b>Dica:</b> Selecione apenas um mês para ver análise detalhada (cliente com mais manutenção/montagem, equipamento problemático).
+            </div>
           </div>
 
-          <!-- KPIs por mês -->
+          <!-- Análise detalhada de um único mês -->
+          <div id="monthDetailedAnalysis" class="mt-4 hidden">
+            <!-- Será preenchido dinamicamente quando apenas um mês for selecionado -->
+          </div>
+
+          <!-- KPIs por mês (para múltiplos meses) -->
           <div id="monthlyKPIs" class="mt-4"></div>
 
-          <!-- Gráficos -->
-          <div class="grid grid-cols-1 lg:grid-cols-2 gap-3 mt-4">
-            <div class="card rounded-2xl p-3 bg-white shadowMedium">
-              <div class="flex items-center justify-between">
-                <div class="text-sm font-semibold">Comparação por tipo de serviço</div>
-                <div class="text-xs muted" id="compareMeta1">—</div>
+          <!-- Gráficos de comparação (para múltiplos meses) -->
+          <div id="comparisonCharts" class="hidden mt-4">
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-3">
+              <div class="card rounded-2xl p-3 bg-white shadowMedium">
+                <div class="flex items-center justify-between">
+                  <div class="text-sm font-semibold">Comparação por tipo de serviço</div>
+                  <div class="text-xs muted" id="compareMeta1">—</div>
+                </div>
+                <canvas id="compareChart1" height="160"></canvas>
               </div>
-              <canvas id="compareChart1" height="160"></canvas>
+
+              <div class="card rounded-2xl p-3 bg-white shadowMedium">
+                <div class="flex items-center justify-between">
+                  <div class="text-sm font-semibold">Evolução mensal total</div>
+                  <div class="text-xs muted" id="compareMeta2">—</div>
+                </div>
+                <canvas id="compareChart2" height="160"></canvas>
+              </div>
             </div>
 
-            <div class="card rounded-2xl p-3 bg-white shadowMedium">
-              <div class="flex items-center justify-between">
-                <div class="text-sm font-semibold">Evolução mensal total</div>
-                <div class="text-xs muted" id="compareMeta2">—</div>
+            <!-- Tabela comparativa com análise de tendência -->
+            <div class="mt-4 card rounded-2xl p-3 bg-white shadowMedium">
+              <div class="text-sm font-semibold">Tabela comparativa detalhada com Análise de Tendência</div>
+              <div class="text-xs muted">Valores por tipo de serviço em cada mês selecionado + variação percentual</div>
+              <div class="mt-3 overflow-auto border rounded-2xl shadowSoft">
+                <table class="min-w-full text-sm">
+                  <thead class="bg-slate-100">
+                    <tr class="text-left">
+                      <th class="p-2">Tipo</th>
+                      <!-- Cabeçalhos serão preenchidos dinamicamente -->
+                    </tr>
+                  </thead>
+                  <tbody id="compareTableBody"></tbody>
+                </table>
               </div>
-              <canvas id="compareChart2" height="160"></canvas>
-            </div>
-          </div>
-
-          <!-- Tabela comparativa -->
-          <div class="mt-4 card rounded-2xl p-3 bg-white shadowMedium">
-            <div class="text-sm font-semibold">Tabela comparativa detalhada</div>
-            <div class="text-xs muted">Valores por tipo de serviço em cada mês selecionado</div>
-            <div class="mt-3 overflow-auto border rounded-2xl shadowSoft">
-              <table class="min-w-full text-sm">
-                <thead class="bg-slate-100">
-                  <tr class="text-left">
-                    <th class="p-2">Tipo</th>
-                    <!-- Cabeçalhos serão preenchidos dinamicamente -->
-                  </tr>
-                </thead>
-                <tbody id="compareTableBody"></tbody>
-              </table>
             </div>
           </div>
         </div>
@@ -396,6 +428,7 @@
                 <span class="mono font-semibold" id="alertPeriodLabel">30 dias</span>
               </div>
               <button id="btnRefreshAlerts" class="btn px-3 py-1.5 rounded-xl bg-white text-sm shadowSoft">Atualizar alertas</button>
+              <button id="btnPrintAlerts" class="btn px-3 py-1.5 rounded-xl bg-white text-sm shadowSoft">Imprimir alertas</button>
             </div>
           </div>
 
@@ -557,6 +590,11 @@
     </div>
   </div>
 
+  <!-- CONTEÚDO PARA IMPRESSÃO (HIDDEN) -->
+  <div id="printableAlerts" class="hidden">
+    <!-- Será preenchido dinamicamente quando imprimir -->
+  </div>
+
 <script>
 /* =========================
    BASE
@@ -705,12 +743,15 @@ const pages = {
 
 // Elementos da página de comparação
 const monthsCheckboxContainer = el("monthsCheckboxContainer");
+const monthDetailedAnalysis = el("monthDetailedAnalysis");
 const monthlyKPIs = el("monthlyKPIs");
+const comparisonCharts = el("comparisonCharts");
 const compareTableBody = el("compareTableBody");
 
 // Elementos da página de alertas
 const alertPeriodLabel = el("alertPeriodLabel");
 const btnRefreshAlerts = el("btnRefreshAlerts");
+const btnPrintAlerts = el("btnPrintAlerts");
 const alertSummary = el("alertSummary");
 const alertsContainer = el("alertsContainer");
 const noAlertsMessage = el("noAlertsMessage");
@@ -1146,7 +1187,7 @@ function createAlertElement(alert, index) {
   tableContainer.appendChild(table);
   details.appendChild(tableContainer);
   
-  // Ações - ADICIONADO BOTÃO IMPRIMIR
+  // Ações
   const actionsDiv = document.createElement('div');
   actionsDiv.className = 'flex justify-between items-center mt-3 pt-3 border-t';
   
@@ -1175,18 +1216,8 @@ function createAlertElement(alert, index) {
     openDrill('cliente', alert.cliente);
   });
   
-  // NOVO BOTÃO IMPRIMIR
-  const printBtn = document.createElement('button');
-  printBtn.className = 'btn btnPrimary px-3 py-1.5 rounded-xl text-white text-sm shadowSoft';
-  printBtn.innerHTML = '<svg class="w-4 h-4 inline mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path></svg> Imprimir';
-  printBtn.addEventListener('click', (e) => {
-    e.stopPropagation();
-    printAlert(alert);
-  });
-  
   actionButtons.appendChild(filterBtn);
   actionButtons.appendChild(drillBtn);
-  actionButtons.appendChild(printBtn);
   
   actionsDiv.appendChild(infoText);
   actionsDiv.appendChild(actionButtons);
@@ -1195,142 +1226,6 @@ function createAlertElement(alert, index) {
   alertDiv.appendChild(details);
   
   return alertDiv;
-}
-
-// FUNÇÃO PARA IMPRIMIR ALERTA
-function printAlert(alert) {
-  const printWindow = window.open('', '_blank', 'width=800,height=600');
-  printWindow.document.write(`
-    <!DOCTYPE html>
-    <html lang="pt-BR">
-    <head>
-      <meta charset="UTF-8">
-      <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <title>Relatório de Alerta - ${escapeHtml(alert.cliente)}</title>
-      <style>
-        body { font-family: Arial, sans-serif; margin: 20px; color: #333; }
-        .header { border-bottom: 2px solid #333; padding-bottom: 10px; margin-bottom: 20px; }
-        .title { font-size: 24px; font-weight: bold; margin-bottom: 5px; }
-        .subtitle { font-size: 14px; color: #666; }
-        .section { margin-bottom: 20px; }
-        .section-title { font-size: 18px; font-weight: bold; border-bottom: 1px solid #ccc; padding-bottom: 5px; margin-bottom: 10px; }
-        .info-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-bottom: 15px; }
-        .info-item { display: flex; justify-content: space-between; border-bottom: 1px dashed #eee; padding: 5px 0; }
-        .label { font-weight: bold; }
-        .table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-        .table th { background-color: #f0f0f0; text-align: left; padding: 8px; border: 1px solid #ddd; }
-        .table td { padding: 8px; border: 1px solid #ddd; }
-        .severity-high { color: #dc2626; font-weight: bold; }
-        .severity-medium { color: #d97706; font-weight: bold; }
-        .severity-low { color: #2563eb; font-weight: bold; }
-        .footer { margin-top: 30px; font-size: 12px; color: #666; text-align: center; }
-      </style>
-    </head>
-    <body>
-      <div class="header">
-        <div class="title">Relatório de Alerta - Cliente Problemático</div>
-        <div class="subtitle">Smart Conecta • Portal Operacional & RH • ${new Date().toLocaleDateString('pt-BR')}</div>
-      </div>
-      
-      <div class="section">
-        <div class="section-title">Informações do Cliente</div>
-        <div class="info-grid">
-          <div class="info-item">
-            <span class="label">Cliente:</span>
-            <span>${escapeHtml(alert.cliente)}</span>
-          </div>
-          <div class="info-item">
-            <span class="label">Criticidade:</span>
-            <span class="severity-${alert.severity}">${alert.severity === 'high' ? 'ALTA' : alert.severity === 'medium' ? 'MÉDIA' : 'BAIXA'}</span>
-          </div>
-          <div class="info-item">
-            <span class="label">Total de Manutenções:</span>
-            <span>${alert.totalManut}</span>
-          </div>
-          <div class="info-item">
-            <span class="label">Manutenções em ${alert.windowDays} dias:</span>
-            <span>${alert.maxInWindow}</span>
-          </div>
-          <div class="info-item">
-            <span class="label">Período de Análise:</span>
-            <span>${alert.windowStart || 'N/A'}</span>
-          </div>
-          <div class="info-item">
-            <span class="label">Data do Relatório:</span>
-            <span>${new Date().toLocaleDateString('pt-BR')}</span>
-          </div>
-        </div>
-      </div>
-      
-      <div class="section">
-        <div class="section-title">Equipamentos Envolvidos</div>
-        <div>${alert.equipamentos.length > 0 ? alert.equipamentos.map(e => escapeHtml(e)).join(', ') : 'Nenhum equipamento identificado'}</div>
-      </div>
-      
-      <div class="section">
-        <div class="section-title">Técnicos Envolvidos</div>
-        <div>${alert.tecnicos.length > 0 ? alert.tecnicos.map(t => escapeHtml(t)).join(', ') : 'Nenhum técnico identificado'}</div>
-      </div>
-      
-      <div class="section">
-        <div class="section-title">Motivos Mais Comuns</div>
-        <ul>
-          ${alert.topMotivos.map(([motivo, count]) => `<li>${escapeHtml(motivo)} (${count} ocorrências)</li>`).join('')}
-        </ul>
-      </div>
-      
-      <div class="section">
-        <div class="section-title">Registros de Manutenção</div>
-        <table class="table">
-          <thead>
-            <tr>
-              <th>Data</th>
-              <th>Chamado</th>
-              <th>Técnico</th>
-              <th>Acrésc.</th>
-              <th>Motivo</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${alert.records.slice(0, 15).map(record => `
-              <tr>
-                <td>${record.data || ''}</td>
-                <td>${escapeHtml(record.chamado)}</td>
-                <td>${escapeHtml(record.tecnico)}</td>
-                <td>${record.acrescimo || 0}</td>
-                <td>${escapeHtml(record.motivo)}</td>
-              </tr>
-            `).join('')}
-            ${alert.records.length > 15 ? `<tr><td colspan="5" style="text-align: center; font-style: italic;">... e mais ${alert.records.length - 15} registro(s)</td></tr>` : ''}
-          </tbody>
-        </table>
-      </div>
-      
-      <div class="section">
-        <div class="section-title">Recomendações</div>
-        <p>Este cliente apresenta múltiplas manutenções em um período curto (${alert.maxInWindow} manutenções em ${alert.windowDays} dias). Recomenda-se:</p>
-        <ul>
-          <li>Visita técnica para verificação geral dos equipamentos</li>
-          <li>Avaliação da necessidade de substituição de equipamentos problemáticos</li>
-          <li>Treinamento do cliente sobre uso e manutenção preventiva</li>
-          <li>Acompanhamento especial nas próximas semanas</li>
-        </ul>
-      </div>
-      
-      <div class="footer">
-        <p>Relatório gerado automaticamente pelo Portal Operacional & RH - Smart Conecta</p>
-        <p>Data de geração: ${new Date().toLocaleString('pt-BR')}</p>
-      </div>
-      
-      <script>
-        window.onload = function() {
-          window.print();
-        };
-      <\/script>
-    </body>
-    </html>
-  `);
-  printWindow.document.close();
 }
 
 function toggleAlertDetails(index) {
@@ -1350,6 +1245,241 @@ function toggleAlertDetails(index) {
     details.classList.add('open');
     alertDiv.classList.add('alert-expanded');
   }
+}
+
+// FUNÇÃO PARA IMPRIMIR ALERTAS
+function printAlerts() {
+  if (alertsData.length === 0) {
+    alert('Nenhum alerta para imprimir.');
+    return;
+  }
+  
+  const printableDiv = el('printableAlerts');
+  printableDiv.innerHTML = '';
+  
+  // Criar conteúdo para impressão
+  let printHTML = `
+    <style>
+      @media print {
+        body { font-family: Arial, sans-serif; }
+        .print-header { text-align: center; margin-bottom: 20px; }
+        .print-title { font-size: 24px; font-weight: bold; }
+        .print-subtitle { font-size: 14px; color: #666; }
+        .print-date { font-size: 12px; margin-top: 10px; }
+        .print-section { margin-bottom: 20px; }
+        .print-table { width: 100%; border-collapse: collapse; margin: 10px 0; }
+        .print-table th, .print-table td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        .print-table th { background-color: #f5f5f5; font-weight: bold; }
+        .alert-high-row { background-color: #fef2f2; }
+        .alert-medium-row { background-color: #fffbeb; }
+        .alert-low-row { background-color: #eff6ff; }
+        .severity-badge { padding: 2px 6px; border-radius: 3px; font-size: 10px; font-weight: bold; }
+        .severity-high { background-color: #fecaca; color: #991b1b; }
+        .severity-medium { background-color: #fef3c7; color: #92400e; }
+        .severity-low { background-color: #dbeafe; color: #1e40af; }
+        .print-summary { display: flex; justify-content: space-between; margin: 20px 0; }
+        .summary-item { text-align: center; }
+        .summary-value { font-size: 24px; font-weight: bold; }
+        .summary-label { font-size: 12px; color: #666; }
+        .page-break { page-break-after: always; }
+      }
+    </style>
+    
+    <div class="print-header">
+      <div class="print-title">Relatório de Alertas - Smart Conecta</div>
+      <div class="print-subtitle">Clientes com múltiplas manutenções em período curto</div>
+      <div class="print-date">Gerado em: ${new Date().toLocaleDateString('pt-BR')}</div>
+    </div>
+    
+    <div class="print-summary">
+      <div class="summary-item">
+        <div class="summary-value">${alertsData.length}</div>
+        <div class="summary-label">Total de Alertas</div>
+      </div>
+      <div class="summary-item">
+        <div class="summary-value">${alertsData.filter(a => a.severity === 'high').length}</div>
+        <div class="summary-label">Alta Criticidade</div>
+      </div>
+      <div class="summary-item">
+        <div class="summary-value">${alertsData.filter(a => a.severity === 'medium').length}</div>
+        <div class="summary-label">Média Criticidade</div>
+      </div>
+      <div class="summary-item">
+        <div class="summary-value">${alertsData.filter(a => a.severity === 'low').length}</div>
+        <div class="summary-label">Baixa Criticidade</div>
+      </div>
+    </div>
+    
+    <div class="print-section">
+      <h3>Lista de Alertas (${alertsData.length})</h3>
+      <table class="print-table">
+        <thead>
+          <tr>
+            <th>Cliente</th>
+            <th>Criticidade</th>
+            <th>Total Manutenções</th>
+            <th>Máx. em ${alertDias.value} dias</th>
+            <th>Primeira Data</th>
+            <th>Equipamentos</th>
+            <th>Técnicos</th>
+          </tr>
+        </thead>
+        <tbody>
+  `;
+  
+  // Adicionar cada alerta
+  alertsData.forEach(alert => {
+    const severityClass = `severity-${alert.severity}`;
+    const severityText = alert.severity === 'high' ? 'ALTA' : 
+                        alert.severity === 'medium' ? 'MÉDIA' : 'BAIXA';
+    
+    printHTML += `
+      <tr class="alert-${alert.severity}-row">
+        <td>${escapeHtml(alert.cliente)}</td>
+        <td><span class="severity-badge ${severityClass}">${severityText}</span></td>
+        <td>${alert.totalManut}</td>
+        <td>${alert.maxInWindow}</td>
+        <td>${alert.windowStart || 'N/A'}</td>
+        <td>${alert.equipamentos.length > 0 ? alert.equipamentos.join(', ') : 'Nenhum'}</td>
+        <td>${alert.tecnicos.length > 0 ? alert.tecnicos.join(', ') : 'Nenhum'}</td>
+      </tr>
+    `;
+  });
+  
+  printHTML += `
+        </tbody>
+      </table>
+    </div>
+    
+    <div class="print-section">
+      <h3>Detalhes por Cliente</h3>
+  `;
+  
+  // Adicionar detalhes de cada cliente
+  alertsData.forEach((alert, index) => {
+    const severityText = alert.severity === 'high' ? 'ALTA' : 
+                        alert.severity === 'medium' ? 'MÉDIA' : 'BAIXA';
+    
+    printHTML += `
+      <div style="margin-bottom: 15px; padding: 10px; border: 1px solid #ddd; border-left: 4px solid ${
+        alert.severity === 'high' ? '#ef4444' : 
+        alert.severity === 'medium' ? '#f59e0b' : '#3b82f6'
+      };">
+        <h4 style="margin: 0 0 5px 0;">${escapeHtml(alert.cliente)} - <span style="color: ${
+          alert.severity === 'high' ? '#ef4444' : 
+          alert.severity === 'medium' ? '#f59e0b' : '#3b82f6'
+        };">${severityText}</span></h4>
+        <div style="font-size: 12px; color: #666; margin-bottom: 10px;">
+          ${alert.totalManut} manutenções no total • 
+          ${alert.maxInWindow} manutenções em ${alert.windowDays} dias
+        </div>
+        
+        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 10px;">
+          <div>
+            <strong>Equipamentos:</strong><br>
+            ${alert.equipamentos.length > 0 ? alert.equipamentos.map(e => `• ${escapeHtml(e)}`).join('<br>') : 'Nenhum'}
+          </div>
+          <div>
+            <strong>Técnicos:</strong><br>
+            ${alert.tecnicos.length > 0 ? alert.tecnicos.map(t => `• ${escapeHtml(t)}`).join('<br>') : 'Nenhum'}
+          </div>
+          <div>
+            <strong>Motivos comuns:</strong><br>
+            ${alert.topMotivos.length > 0 ? alert.topMotivos.map(([m, c]) => `• ${escapeHtml(m)} (${c})`).join('<br>') : 'Nenhum'}
+          </div>
+        </div>
+        
+        <div style="font-size: 11px;">
+          <strong>Primeiros 5 registros:</strong>
+          <table style="width: 100%; border-collapse: collapse; font-size: 10px;">
+            <thead>
+              <tr style="background-color: #f5f5f5;">
+                <th style="border: 1px solid #ddd; padding: 3px;">Data</th>
+                <th style="border: 1px solid #ddd; padding: 3px;">Chamado</th>
+                <th style="border: 1px solid #ddd; padding: 3px;">Técnico</th>
+                <th style="border: 1px solid #ddd; padding: 3px;">Acrésc.</th>
+                <th style="border: 1px solid #ddd; padding: 3px;">Motivo</th>
+              </tr>
+            </thead>
+            <tbody>
+  `;
+    
+    // Adicionar primeiros 5 registros
+    const firstRecords = alert.records.slice(0, 5);
+    firstRecords.forEach(record => {
+      printHTML += `
+        <tr>
+          <td style="border: 1px solid #ddd; padding: 3px;">${record.data || ''}</td>
+          <td style="border: 1px solid #ddd; padding: 3px;">${escapeHtml(record.chamado)}</td>
+          <td style="border: 1px solid #ddd; padding: 3px;">${escapeHtml(record.tecnico)}</td>
+          <td style="border: 1px solid #ddd; padding: 3px;">${record.acrescimo || 0}</td>
+          <td style="border: 1px solid #ddd; padding: 3px;">${escapeHtml(record.motivo.substring(0, 50))}${record.motivo.length > 50 ? '...' : ''}</td>
+        </tr>
+      `;
+    });
+    
+    printHTML += `
+            </tbody>
+          </table>
+          ${alert.records.length > 5 ? `<div style="font-size: 9px; text-align: right; margin-top: 3px;">... e mais ${alert.records.length - 5} registros</div>` : ''}
+        </div>
+      </div>
+    `;
+    
+    // Adicionar quebra de página a cada 3 alertas (exceto o último)
+    if ((index + 1) % 3 === 0 && index !== alertsData.length - 1) {
+      printHTML += '<div class="page-break"></div>';
+    }
+  });
+  
+  printHTML += `
+    </div>
+    
+    <div class="print-section" style="page-break-before: always;">
+      <h3>Resumo Executivo</h3>
+      <ul style="font-size: 12px;">
+        <li>Total de clientes com alertas: ${alertsData.length}</li>
+        <li>Clientes com alta criticidade: ${alertsData.filter(a => a.severity === 'high').length}</li>
+        <li>Período de análise: ${alertDias.value} dias</li>
+        <li>Critério mínimo: ${alertMinManut.value} manutenções no período</li>
+        <li>Data de geração: ${new Date().toLocaleDateString('pt-BR')} ${new Date().toLocaleTimeString('pt-BR')}</li>
+      </ul>
+      <div style="font-size: 11px; color: #666; margin-top: 20px; border-top: 1px solid #ddd; padding-top: 10px;">
+        <strong>Recomendações:</strong>
+        <ol style="margin-top: 5px;">
+          <li>Clientes com ALTA criticidade devem receber visita técnica prioritária</li>
+          <li>Verificar equipamentos problemáticos para possível substituição</li>
+          <li>Acompanhar técnicos que atenderam múltiplas manutenções</li>
+          <li>Analisar padrões comuns nos motivos dos chamados</li>
+        </ol>
+      </div>
+    </div>
+  `;
+  
+  printableDiv.innerHTML = printHTML;
+  
+  // Abrir janela de impressão
+  const printWindow = window.open('', '_blank');
+  printWindow.document.write(`
+    <html>
+      <head>
+        <title>Relatório de Alertas - Smart Conecta</title>
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.css">
+      </head>
+      <body>
+        ${printableDiv.innerHTML}
+        <script>
+          window.onload = function() {
+            window.print();
+            setTimeout(function() {
+              window.close();
+            }, 1000);
+          };
+        <\/script>
+      </body>
+    </html>
+  `);
+  printWindow.document.close();
 }
 
 /* =========================
@@ -1596,7 +1726,7 @@ function applyFilters(){
 }
 
 /* =========================
-   COMPARAÇÃO MENSAL
+   COMPARAÇÃO MENSAL - NOVA FUNCIONALIDADE
 ========================= */
 function fillMonthsCheckboxes() {
   const months = monthsAvailableFromFiltered();
@@ -1638,14 +1768,172 @@ function monthsAvailableFromFiltered() {
 function renderMonthlyComparison() {
   const months = Array.from(selectedMonths).sort();
   
+  // Mostrar/ocultar seções baseado no número de meses selecionados
   if (months.length === 0) {
-    monthlyKPIs.innerHTML = '<div class="text-sm muted p-3">Selecione pelo menos um mês para visualizar a comparação</div>';
-    destroyIfExists(compareChart1);
-    destroyIfExists(compareChart2);
-    compareTableBody.innerHTML = '';
+    monthDetailedAnalysis.classList.add('hidden');
+    monthlyKPIs.innerHTML = '<div class="text-sm muted p-3">Selecione pelo menos um mês para visualizar a análise</div>';
+    comparisonCharts.classList.add('hidden');
     return;
   }
   
+  if (months.length === 1) {
+    // Mostrar análise detalhada de um único mês
+    renderSingleMonthDetailedAnalysis(months[0]);
+    comparisonCharts.classList.add('hidden');
+    monthlyKPIs.innerHTML = '';
+  } else {
+    // Mostrar comparação entre múltiplos meses
+    monthDetailedAnalysis.classList.add('hidden');
+    renderMultipleMonthsComparison(months);
+    comparisonCharts.classList.remove('hidden');
+  }
+}
+
+function renderSingleMonthDetailedAnalysis(month) {
+  const monthRecords = filtered.filter(r => r.month === month);
+  
+  // 1. Qual cliente do mês teve mais manutenção?
+  const manutencaoRecords = monthRecords.filter(r => r.tipo === "Manutenção");
+  const clienteManutCount = groupCount(manutencaoRecords, r => r.cliente || "(vazio)");
+  const topClienteManut = topN(clienteManutCount, 1)[0] || ["Nenhum", 0];
+  
+  // 2. Qual cliente do mês teve mais montagem?
+  const montagemRecords = monthRecords.filter(r => r.tipo === "Montagem");
+  const clienteMontCount = groupCount(montagemRecords, r => r.cliente || "(vazio)");
+  const topClienteMont = topN(clienteMontCount, 1)[0] || ["Nenhum", 0];
+  
+  // 3. Qual equipamento do mês X deu mais problemas?
+  // Consideramos "problemas" como manutenções em equipamentos
+  const equipProblemMap = new Map();
+  manutencaoRecords.forEach(r => {
+    for (const col of equipColumns) {
+      const qty = toInt((r._raw||{})[col]);
+      if (qty > 0) {
+        equipProblemMap.set(col, (equipProblemMap.get(col) || 0) + qty);
+      }
+    }
+  });
+  const topEquipProblem = topN(equipProblemMap, 5);
+  
+  // 4. Total do mês e comparação com mês anterior (se disponível)
+  const allMonths = monthsAvailableFromFiltered();
+  const monthIndex = allMonths.indexOf(month);
+  let trendInfo = { total: monthRecords.length, diff: null, pct: null };
+  
+  if (monthIndex > 0) {
+    const prevMonth = allMonths[monthIndex - 1];
+    const prevMonthRecords = filtered.filter(r => r.month === prevMonth);
+    const prevTotal = prevMonthRecords.length;
+    const diff = monthRecords.length - prevTotal;
+    const pct = prevTotal > 0 ? ((diff / prevTotal) * 100).toFixed(1) : null;
+    
+    trendInfo = {
+      total: monthRecords.length,
+      diff,
+      pct,
+      prevMonth,
+      prevTotal
+    };
+  }
+  
+  // Renderizar análise detalhada
+  monthDetailedAnalysis.classList.remove('hidden');
+  monthDetailedAnalysis.innerHTML = `
+    <div class="card rounded-2xl p-4 bg-white month-analysis shadowMedium">
+      <div class="flex items-center justify-between mb-4">
+        <div>
+          <div class="text-lg font-semibold">Análise Detalhada - ${month}</div>
+          <div class="text-xs muted">${monthRecords.length} registros no mês</div>
+        </div>
+        <div class="chip rounded-xl px-3 py-2 bg-slate-50 text-xs shadowSoft">
+          <span class="muted">Tendência:</span> 
+          <span class="mono font-semibold ${trendInfo.diff > 0 ? 'trend-up' : trendInfo.diff < 0 ? 'trend-down' : 'trend-neutral'}">
+            ${trendInfo.diff !== null ? `${trendInfo.diff > 0 ? '+' : ''}${trendInfo.diff} (${trendInfo.pct}%)` : 'N/A'}
+          </span>
+        </div>
+      </div>
+      
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+        <!-- Cliente com mais manutenção -->
+        <div class="card rounded-xl p-3 bg-slate-50 shadowSoft">
+          <div class="text-xs muted mb-1">Cliente com mais manutenção</div>
+          <div class="text-lg font-semibold truncate">${escapeHtml(topClienteManut[0])}</div>
+          <div class="text-sm mono">${topClienteManut[1]} manutenções</div>
+          <div class="text-xs muted mt-1">de ${manutencaoRecords.length} total</div>
+        </div>
+        
+        <!-- Cliente com mais montagem -->
+        <div class="card rounded-xl p-3 bg-slate-50 shadowSoft">
+          <div class="text-xs muted mb-1">Cliente com mais montagem</div>
+          <div class="text-lg font-semibold truncate">${escapeHtml(topClienteMont[0])}</div>
+          <div class="text-sm mono">${topClienteMont[1]} montagens</div>
+          <div class="text-xs muted mt-1">de ${montagemRecords.length} total</div>
+        </div>
+        
+        <!-- Total do mês -->
+        <div class="card rounded-xl p-3 bg-slate-50 shadowSoft">
+          <div class="text-xs muted mb-1">Total do mês</div>
+          <div class="text-2xl font-semibold mono">${monthRecords.length}</div>
+          <div class="text-xs muted mt-1">
+            ${trendInfo.prevMonth ? 
+              `vs ${trendInfo.prevMonth}: ${trendInfo.prevTotal}` : 
+              'Primeiro mês disponível'}
+          </div>
+        </div>
+      </div>
+      
+      <!-- Equipamentos problemáticos -->
+      <div class="card rounded-xl p-3 bg-white shadowSoft">
+        <div class="text-sm font-semibold mb-2">Equipamentos com mais problemas (manutenções)</div>
+        <div class="text-xs muted mb-3">Top 5 equipamentos por quantidade de manutenções no mês</div>
+        
+        <div class="overflow-auto border rounded-lg">
+          <table class="min-w-full text-sm">
+            <thead class="bg-slate-100">
+              <tr class="text-left">
+                <th class="p-2">Equipamento</th>
+                <th class="p-2">Manutenções</th>
+                <th class="p-2">% do total</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${topEquipProblem.length > 0 ? 
+                topEquipProblem.map(([equip, count]) => `
+                  <tr class="border-t hover:bg-slate-50">
+                    <td class="p-2">${escapeHtml(equip)}</td>
+                    <td class="p-2 mono font-semibold">${count}</td>
+                    <td class="p-2 mono">${manutencaoRecords.length > 0 ? ((count / manutencaoRecords.length * 100).toFixed(1) + '%') : '0%'}</td>
+                  </tr>
+                `).join('') : 
+                `<tr class="border-t"><td class="p-2 muted" colspan="3">Nenhuma manutenção registrada neste mês</td></tr>`
+              }
+            </tbody>
+          </table>
+        </div>
+      </div>
+      
+      <!-- Distribuição por tipo -->
+      <div class="mt-4 card rounded-xl p-3 bg-white shadowSoft">
+        <div class="text-sm font-semibold mb-2">Distribuição por tipo de serviço</div>
+        <div class="grid grid-cols-2 md:grid-cols-5 gap-2">
+          ${VALID_TIPOS.map(tipo => {
+            const count = monthRecords.filter(r => r.tipo === tipo).length;
+            const pct = monthRecords.length > 0 ? ((count / monthRecords.length) * 100).toFixed(1) : 0;
+            return `
+              <div class="card rounded-lg p-2 bg-slate-50 text-center">
+                <div class="text-xs muted">${tipo}</div>
+                <div class="text-lg font-semibold mono">${count}</div>
+                <div class="text-xs muted">${pct}%</div>
+              </div>
+            `;
+          }).join('')}
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function renderMultipleMonthsComparison(months) {
   // Dados por mês
   const monthlyData = months.map(month => {
     const monthRecords = filtered.filter(r => r.month === month && VALID_TIPOS.includes(r.tipo));
@@ -1676,8 +1964,8 @@ function renderMonthlyComparison() {
   // Render gráficos
   renderComparisonCharts(monthlyData);
   
-  // Render tabela comparativa
-  renderComparisonTable(monthlyData);
+  // Render tabela comparativa com análise de tendência
+  renderComparisonTableWithTrend(monthlyData);
 }
 
 function renderMonthlyKPIs(monthlyData) {
@@ -1791,7 +2079,7 @@ function renderComparisonCharts(monthlyData) {
   el("compareMeta2").textContent = `${months.length} mês(es) selecionado(s)`;
 }
 
-function renderComparisonTable(monthlyData) {
+function renderComparisonTableWithTrend(monthlyData) {
   const months = monthlyData.map(d => d.month);
   
   // Cabeçalho
@@ -1800,40 +2088,87 @@ function renderComparisonTable(monthlyData) {
   months.forEach(month => {
     thead.innerHTML += `<th class="p-2">${month}</th>`;
   });
-  thead.innerHTML += '<th class="p-2">Total</th>';
+  thead.innerHTML += '<th class="p-2">Variação</th><th class="p-2">%</th>';
   
   // Corpo da tabela
   let tableHTML = '';
+  
+  // Calcular totais por mês
+  const totalsByMonth = months.map(month => {
+    const data = monthlyData.find(d => d.month === month);
+    return data ? data.totalValid : 0;
+  });
   
   // Linhas para cada tipo
   VALID_TIPOS.forEach(tipo => {
     const rowData = months.map(month => {
       const data = monthlyData.find(d => d.month === month);
-      return data.counts[tipo] || 0;
+      return data ? data.counts[tipo] || 0 : 0;
     });
-    const total = rowData.reduce((sum, val) => sum + val, 0);
+    
+    // Calcular variação
+    const firstValue = rowData[0];
+    const lastValue = rowData[rowData.length - 1];
+    const variation = lastValue - firstValue;
+    const variationPct = firstValue > 0 ? ((variation / firstValue) * 100).toFixed(1) : 'N/A';
     
     tableHTML += `
       <tr class="border-t hover:bg-slate-50">
         <td class="p-2 font-medium">${tipo}</td>
         ${rowData.map(val => `<td class="p-2 mono text-center">${val}</td>`).join('')}
-        <td class="p-2 mono font-semibold text-center">${total}</td>
+        <td class="p-2 mono text-center ${variation > 0 ? 'trend-up' : variation < 0 ? 'trend-down' : ''}">
+          ${variation > 0 ? '+' : ''}${variation}
+        </td>
+        <td class="p-2 mono text-center ${variation > 0 ? 'trend-up' : variation < 0 ? 'trend-down' : ''}">
+          ${variationPct !== 'N/A' ? `${variationPct}%` : 'N/A'}
+        </td>
       </tr>
     `;
   });
   
-  // Linha de total
-  const totals = months.map(month => {
-    const data = monthlyData.find(d => d.month === month);
-    return data.totalValid;
-  });
-  const grandTotal = totals.reduce((sum, val) => sum + val, 0);
+  // Linha de total com análise de tendência
+  const firstTotal = totalsByMonth[0];
+  const lastTotal = totalsByMonth[totalsByMonth.length - 1];
+  const totalVariation = lastTotal - firstTotal;
+  const totalVariationPct = firstTotal > 0 ? ((totalVariation / firstTotal) * 100).toFixed(1) : 'N/A';
+  const totalRowData = totalsByMonth;
+  const grandTotal = totalRowData.reduce((sum, val) => sum + val, 0);
+  const avgPerMonth = (grandTotal / months.length).toFixed(1);
   
   tableHTML += `
-    <tr class="border-t bg-slate-50">
+    <tr class="border-t bg-slate-100">
       <td class="p-2 font-semibold">TOTAL</td>
-      ${totals.map(val => `<td class="p-2 mono font-semibold text-center">${val}</td>`).join('')}
-      <td class="p-2 mono font-semibold text-center">${grandTotal}</td>
+      ${totalRowData.map(val => `<td class="p-2 mono font-semibold text-center">${val}</td>`).join('')}
+      <td class="p-2 mono font-semibold text-center ${totalVariation > 0 ? 'trend-up' : totalVariation < 0 ? 'trend-down' : ''}">
+        ${totalVariation > 0 ? '+' : ''}${totalVariation}
+      </td>
+      <td class="p-2 mono font-semibold text-center ${totalVariation > 0 ? 'trend-up' : totalVariation < 0 ? 'trend-down' : ''}">
+        ${totalVariationPct !== 'N/A' ? `${totalVariationPct}%` : 'N/A'}
+      </td>
+    </tr>
+    
+    <tr class="border-t bg-blue-50">
+      <td class="p-2 font-medium text-blue-800">ANÁLISE DE TENDÊNCIA</td>
+      <td colspan="${months.length + 1}" class="p-2 text-sm text-blue-800">
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-2">
+          <div>
+            <span class="muted">Período:</span> ${months[0]} → ${months[months.length - 1]}
+          </div>
+          <div>
+            <span class="muted">Variação total:</span> ${totalVariation > 0 ? '+' : ''}${totalVariation} (${totalVariationPct !== 'N/A' ? `${totalVariationPct}%` : 'N/A'})
+          </div>
+          <div>
+            <span class="muted">Média/mês:</span> ${avgPerMonth}
+          </div>
+          <div>
+            <span class="muted">Tendência:</span> 
+            <span class="${totalVariation > 0 ? 'trend-up font-semibold' : totalVariation < 0 ? 'trend-down font-semibold' : 'trend-neutral'}">
+              ${totalVariation > 0 ? '↗ Crescimento' : totalVariation < 0 ? '↘ Queda' : '➡ Estável'}
+            </span>
+          </div>
+        </div>
+      </td>
+      <td class="p-2"></td>
     </tr>
   `;
   
@@ -2804,6 +3139,7 @@ fSearch.addEventListener("input", debounce(applyFilters, 300));
 alertDias.addEventListener("change", renderAlerts);
 alertMinManut.addEventListener("change", renderAlerts);
 btnRefreshAlerts.addEventListener("click", renderAlerts);
+btnPrintAlerts.addEventListener("click", printAlerts);
 
 // Eventos de acréscimos
 acrescWindowDays.addEventListener("change", analyzeAcrescimos);
