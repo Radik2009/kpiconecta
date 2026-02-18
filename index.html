@@ -82,6 +82,14 @@
           <input id="fileInput" type="file" accept=".xlsx,.xls" class="hidden"/>
         </label>
 
+        <!-- NOVO BOTÃO ABASTECIMENTO - ABRE EM NOVA ABA -->
+        <button id="btnAbastecimento" class="btn px-3 py-2 rounded-xl bg-white text-sm shadowSoft hover:shadowMedium flex items-center gap-1">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+          </svg>
+          Abastecimento
+        </button>
+
         <div class="flex items-center gap-2">
           <div class="text-xs muted">Módulo</div>
           <select id="moduleSel" class="btn px-3 py-2 rounded-xl bg-white text-sm shadowSoft">
@@ -97,6 +105,9 @@
       </div>
     </header>
 
+    <!-- Resto do código permanece igual... -->
+    <!-- ... -->
+    
     <div class="grid grid-cols-1 lg:grid-cols-12 gap-4 mt-4">
       <!-- SIDEBAR -->
       <aside class="lg:col-span-3">
@@ -695,6 +706,7 @@ const moduleSel = el("moduleSel");
 const btnReset  = el("btnReset");
 const btnExportCSV = el("btnExportCSV");
 const btnExportJSON= el("btnExportJSON");
+const btnAbastecimento = el("btnAbastecimento");
 
 const metaTotal = el("metaTotal");
 const metaPeriod= el("metaPeriod");
@@ -775,6 +787,11 @@ const dKpis  = el("dKpis");
 const dTopClients = el("dTopClients");
 const dTopReasons = el("dTopReasons");
 const dTopEquip   = el("dTopEquip");
+
+// ==================== FUNÇÃO PARA ABRIR ABASTECIMENTO ====================
+btnAbastecimento.addEventListener("click", () => {
+  window.open('abastecimento.html', '_blank');
+});
 
 /* =========================
    NORMALIZAÇÃO
