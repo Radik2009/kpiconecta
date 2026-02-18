@@ -1,0 +1,1925 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Smart Conecta • Abastecimento & Frota (V2)</title>
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+
+  <style>
+    .glass { background: rgba(255,255,255,.72); backdrop-filter: blur(10px); }
+    .card { border: 1px solid rgba(148,163,184,.35); }
+    .muted { color: rgb(100 116 139); }
+    .mono { font-variant-numeric: tabular-nums; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono","Courier New", monospace; }
+    .chip { border: 1px solid rgba(148,163,184,.45); }
+    .shadowSoft { box-shadow: 0 10px 30px rgba(2,6,23,.08); }
+    .shadowMedium { box-shadow: 0 15px 40px rgba(2,6,23,.12); }
+    .shadowStrong { box-shadow: 0 20px 50px rgba(2,6,23,.15); }
+    .btn { border: 1px solid rgba(148,163,184,.55); }
+    .btnPrimary { background: rgb(15 23 42); color: white; border-color: rgb(15 23 42); }
+    .btnPrimary:hover { filter: brightness(1.08); }
+    .btn:hover { background: rgb(248 250 252); }
+    .kpiVal { letter-spacing: -0.02em; }
+    .activeNav { background: rgba(15,23,42,.08); border-color: rgba(15,23,42,.18); }
+    
+    .vehicle-card { transition: all 0.2s ease; }
+    .vehicle-card:hover { transform: translateY(-2px); }
+    
+    .efficiency-good { border-left: 4px solid #10b981; }
+    .efficiency-warning { border-left: 4px solid #f59e0b; }
+    .efficiency-critical { border-left: 4px solid #ef4444; }
+    
+    @media print {
+      body * { visibility: hidden; }
+      #printableReport, #printableReport * { visibility: visible; }
+      #printableReport { position: absolute; left: 0; top: 0; width: 100%; }
+    }
+  </style>
+</head>
+
+<body class="min-h-screen bg-slate-950 text-slate-900">
+  <!-- BACKGROUND -->
+  <div class="fixed inset-0 -z-10">
+    <div class="absolute inset-0 bg-gradient-to-br from-slate-950 via-slate-950 to-slate-900"></div>
+    <div class="absolute -top-24 -left-24 w-[520px] h-[520px] rounded-full blur-3xl opacity-35 bg-gradient-to-br from-emerald-400 to-cyan-400"></div>
+    <div class="absolute -bottom-24 -right-24 w-[520px] h-[520px] rounded-full blur-3xl opacity-30 bg-gradient-to-br from-fuchsia-400 to-indigo-400"></div>
+  </div>
+
+  <div class="max-w-[1400px] mx-auto px-4 py-4">
+    <!-- TOP BAR -->
+    <header class="glass shadowStrong card rounded-2xl px-4 py-4 flex items-center justify-between gap-3 flex-wrap">
+      <div class="flex items-start gap-3">
+        <div class="w-10 h-10 rounded-2xl bg-slate-900 text-white flex items-center justify-center font-semibold shadowMedium">SC</div>
+        <div>
+          <div class="text-xl font-semibold text-slate-900">Abastecimento & Frota</div>
+          <div class="text-xs muted">Análise de combustível • Desempenho por veículo • Economia • Alertas</div>
+        </div>
+      </div>
+
+      <div class="flex items-center gap-2 flex-wrap">
+        <label class="btn btnPrimary px-3 py-2 rounded-xl cursor-pointer text-sm shadowSoft hover:shadowMedium">
+          Carregar Planilha
+          <input id="fileInput" type="file" accept=".xlsx,.xls" class="hidden"/>
+        </label>
+
+        <button id="btnReset" class="btn px-3 py-2 rounded-xl bg-white text-sm shadowSoft">Reset</button>
+        <button id="btnExportCSV" class="btn px-3 py-2 rounded-xl bg-white text-sm disabled:opacity-50 shadowSoft" disabled>Exportar CSV</button>
+        <button id="btnPrint" class="btn px-3 py-2 rounded-xl bg-white text-sm shadowSoft">Imprimir Relatório</button>
+      </div>
+    </header>
+
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-4 mt-4">
+      <!-- SIDEBAR -->
+      <aside class="lg:col-span-3">
+        <div class="glass shadowMedium card rounded-2xl p-3">
+          <div class="flex items-center justify-between">
+            <div class="text-sm font-semibold">Navegação</div>
+            <div class="w-2.5 h-2.5 rounded-full bg-slate-300" id="dotStatus"></div>
+          </div>
+
+          <div class="text-xs muted mt-1" id="statusLine">Carregue uma planilha para iniciar.</div>
+
+          <div class="grid grid-cols-2 gap-2 mt-3 text-xs">
+            <div class="chip rounded-xl p-2 bg-white shadowSoft">
+              <div class="muted">Abastecimentos</div>
+              <div class="mono font-semibold" id="metaTotal">—</div>
+            </div>
+            <div class="chip rounded-xl p-2 bg-white shadowSoft">
+              <div class="muted">Período</div>
+              <div class="mono font-semibold" id="metaPeriod">—</div>
+            </div>
+            <div class="chip rounded-xl p-2 bg-white shadowSoft">
+              <div class="muted">Veículos</div>
+              <div class="mono font-semibold" id="metaVeiculos">—</div>
+            </div>
+            <div class="chip rounded-xl p-2 bg-white shadowSoft">
+              <div class="muted">Total Gasto</div>
+              <div class="mono font-semibold" id="metaGasto">—</div>
+            </div>
+          </div>
+
+          <div class="mt-4 space-y-2">
+            <button class="navBtn btn w-full text-left px-3 py-2 rounded-xl bg-white activeNav shadowSoft" data-page="dashboard">
+              <div class="text-sm font-semibold">Dashboard</div>
+              <div class="text-xs muted">Visão geral + KPIs + gráficos</div>
+            </button>
+
+            <button class="navBtn btn w-full text-left px-3 py-2 rounded-xl bg-white shadowSoft" data-page="veiculos">
+              <div class="text-sm font-semibold">Desempenho por Veículo</div>
+              <div class="text-xs muted">Análise detalhada de cada carro</div>
+            </button>
+
+            <button class="navBtn btn w-full text-left px-3 py-2 rounded-xl bg-white shadowSoft" data-page="eficiencia">
+              <div class="text-sm font-semibold">Eficiência & Alertas</div>
+              <div class="text-xs muted">Média por km, custo, alertas</div>
+            </button>
+
+            <button class="navBtn btn w-full text-left px-3 py-2 rounded-xl bg-white shadowSoft" data-page="tabela">
+              <div class="text-sm font-semibold">Registros</div>
+              <div class="text-xs muted">Tabela completa de abastecimentos</div>
+            </button>
+
+            <button class="navBtn btn w-full text-left px-3 py-2 rounded-xl bg-white shadowSoft" data-page="analise">
+              <div class="text-sm font-semibold">Análise Mensal</div>
+              <div class="text-xs muted">Comparativo mês a mês</div>
+            </button>
+          </div>
+
+          <div class="mt-4 text-xs muted">
+            Dica: Clique em qualquer gráfico ou veículo para detalhes.
+          </div>
+        </div>
+
+        <!-- FILTROS -->
+        <div class="glass shadowMedium card rounded-2xl p-3 mt-4">
+          <div class="text-sm font-semibold">Filtros</div>
+          <div class="text-xs muted">Aplique e o dashboard recalcula tudo.</div>
+
+          <div class="mt-3">
+            <label class="text-xs muted">Veículo</label>
+            <select id="fVeiculo" class="mt-1 w-full px-3 py-2 rounded-xl border bg-white shadowSoft">
+              <option value="">(Todos)</option>
+            </select>
+          </div>
+
+          <div class="mt-3">
+            <label class="text-xs muted">Motorista</label>
+            <select id="fMotorista" class="mt-1 w-full px-3 py-2 rounded-xl border bg-white shadowSoft">
+              <option value="">(Todos)</option>
+            </select>
+          </div>
+
+          <div class="grid grid-cols-2 gap-2 mt-3">
+            <div>
+              <label class="text-xs muted">De</label>
+              <input id="fDe" type="date" class="mt-1 w-full px-3 py-2 rounded-xl border bg-white shadowSoft"/>
+            </div>
+            <div>
+              <label class="text-xs muted">Até</label>
+              <input id="fAte" type="date" class="mt-1 w-full px-3 py-2 rounded-xl border bg-white shadowSoft"/>
+            </div>
+          </div>
+
+          <div class="mt-3">
+            <label class="text-xs muted">Média mínima (km/L)</label>
+            <input id="fMediaMin" type="number" min="0" step="0.1" value="0" class="mt-1 w-full px-3 py-2 rounded-xl border bg-white shadowSoft"/>
+          </div>
+
+          <div class="mt-3">
+            <label class="text-xs muted">Busca</label>
+            <input id="fSearch" class="mt-1 w-full px-3 py-2 rounded-xl border bg-white shadowSoft" placeholder="Data, veículo, motorista..."/>
+          </div>
+        </div>
+      </aside>
+
+      <!-- MAIN -->
+      <section class="lg:col-span-9 space-y-4">
+        <!-- PAGE: DASHBOARD -->
+        <div id="page-dashboard" class="glass shadowMedium card rounded-2xl p-4">
+          <div class="flex items-start justify-between gap-3 flex-wrap">
+            <div>
+              <div class="text-lg font-semibold">Dashboard de Abastecimento</div>
+              <div class="text-xs muted">Visão geral de gastos, consumo e eficiência da frota</div>
+            </div>
+            <div class="flex items-center gap-2 flex-wrap">
+              <div class="chip rounded-xl px-3 py-2 bg-white text-xs shadowSoft">
+                <span class="muted">Período filtrado:</span> 
+                <span class="mono font-semibold" id="periodoFiltrado">—</span>
+              </div>
+              <div class="chip rounded-xl px-3 py-2 bg-white text-xs shadowSoft">
+                <span class="muted">Média geral:</span> 
+                <span class="mono font-semibold" id="avgMedia">— km/L</span>
+              </div>
+              <div class="chip rounded-xl px-3 py-2 bg-white text-xs shadowSoft">
+                <span class="muted">Custo médio/km:</span> 
+                <span class="mono font-semibold" id="avgCustoKm">— R$/km</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- KPIs principais -->
+          <div id="kpiGrid" class="grid grid-cols-1 md:grid-cols-4 gap-3 mt-4"></div>
+
+          <!-- Gráficos principais -->
+          <div class="grid grid-cols-1 lg:grid-cols-2 gap-3 mt-4">
+            <div class="card rounded-2xl p-3 bg-white shadowMedium">
+              <div class="flex items-center justify-between">
+                <div class="text-sm font-semibold">Gasto por dia (R$)</div>
+                <div class="text-xs muted" id="g1meta">—</div>
+              </div>
+              <canvas id="chartGastoDiario" height="120"></canvas>
+            </div>
+
+            <div class="card rounded-2xl p-3 bg-white shadowMedium">
+              <div class="flex items-center justify-between">
+                <div class="text-sm font-semibold">Consumo por veículo (L)</div>
+                <div class="text-xs muted" id="g2meta">—</div>
+              </div>
+              <canvas id="chartConsumoVeiculo" height="120"></canvas>
+            </div>
+
+            <div class="card rounded-2xl p-3 bg-white shadowMedium">
+              <div class="flex items-center justify-between">
+                <div class="text-sm font-semibold">Média km/L por veículo</div>
+                <div class="text-xs muted" id="g3meta">—</div>
+              </div>
+              <canvas id="chartMediaVeiculo" height="120"></canvas>
+            </div>
+
+            <div class="card rounded-2xl p-3 bg-white shadowMedium">
+              <div class="flex items-center justify-between">
+                <div class="text-sm font-semibold">Custo por km (R$)</div>
+                <div class="text-xs muted" id="g4meta">—</div>
+              </div>
+              <canvas id="chartCustoKm" height="120"></canvas>
+            </div>
+          </div>
+
+          <!-- Top motoristas e alertas rápidos -->
+          <div class="grid grid-cols-1 lg:grid-cols-2 gap-3 mt-4">
+            <div class="card rounded-2xl p-3 bg-white shadowMedium">
+              <div class="text-sm font-semibold">Top motoristas (abastecimentos)</div>
+              <div class="text-xs muted">Motoristas que mais abasteceram no período</div>
+              <div id="topMotoristas" class="mt-2 space-y-1"></div>
+            </div>
+
+            <div class="card rounded-2xl p-3 bg-white shadowMedium">
+              <div class="text-sm font-semibold">Alertas de eficiência</div>
+              <div class="text-xs muted">Veículos com média abaixo do esperado no período</div>
+              <div id="alertasEficiencia" class="mt-2 space-y-1"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- PAGE: VEÍCULOS -->
+        <div id="page-veiculos" class="hidden glass shadowMedium card rounded-2xl p-4">
+          <div class="flex items-center justify-between mb-4">
+            <div>
+              <div class="text-lg font-semibold">Desempenho por Veículo</div>
+              <div class="text-xs muted">Análise detalhada de cada veículo da frota no período filtrado</div>
+            </div>
+            <div>
+              <select id="veiculoSelector" class="btn px-3 py-2 rounded-xl bg-white text-sm shadowSoft">
+                <option value="">Selecione um veículo</option>
+              </select>
+            </div>
+          </div>
+
+          <div id="veiculoDetail" class="hidden">
+            <!-- Cards resumo do veículo -->
+            <div class="grid grid-cols-2 md:grid-cols-5 gap-3 mb-4" id="veiculoKPI"></div>
+
+            <!-- Gráficos do veículo -->
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-3 mb-4">
+              <div class="card rounded-2xl p-3 bg-white shadowMedium">
+                <div class="text-sm font-semibold">Evolução da média (km/L)</div>
+                <canvas id="chartVeiculoMedia" height="120"></canvas>
+              </div>
+              <div class="card rounded-2xl p-3 bg-white shadowMedium">
+                <div class="text-sm font-semibold">Custo acumulado (R$)</div>
+                <canvas id="chartVeiculoCusto" height="120"></canvas>
+              </div>
+            </div>
+
+            <!-- Tabela de abastecimentos do veículo -->
+            <div class="card rounded-2xl p-3 bg-white shadowMedium">
+              <div class="text-sm font-semibold mb-2">Histórico de abastecimentos</div>
+              <div class="overflow-auto border rounded-xl shadowSoft">
+                <table class="min-w-full text-sm">
+                  <thead class="bg-slate-100">
+                    <tr class="text-left">
+                      <th class="p-2">Data</th>
+                      <th class="p-2">Motorista</th>
+                      <th class="p-2">Km Inicial</th>
+                      <th class="p-2">Km Final</th>
+                      <th class="p-2">Km Rodados</th>
+                      <th class="p-2">Litros</th>
+                      <th class="p-2">Valor (R$)</th>
+                      <th class="p-2">Média (km/L)</th>
+                      <th class="p-2">Custo/km (R$)</th>
+                    </tr>
+                  </thead>
+                  <tbody id="veiculoTableBody"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <div id="veiculoNoSelection" class="text-center p-8 muted">
+            Selecione um veículo para ver os detalhes
+          </div>
+        </div>
+
+        <!-- PAGE: EFICIÊNCIA -->
+        <div id="page-eficiencia" class="hidden glass shadowMedium card rounded-2xl p-4">
+          <div class="flex items-center justify-between mb-4">
+            <div>
+              <div class="text-lg font-semibold">Eficiência da Frota</div>
+              <div class="text-xs muted">Análise detalhada de consumo e alertas no período filtrado</div>
+            </div>
+            <div class="flex items-center gap-2">
+              <label class="text-xs muted">Meta mínima (km/L):</label>
+              <input id="metaEficiencia" type="number" min="0" step="0.1" value="8" class="btn px-3 py-2 rounded-xl bg-white text-sm shadowSoft w-20"/>
+              <button id="btnAtualizarEficiencia" class="btn px-3 py-2 rounded-xl bg-white text-sm shadowSoft">Atualizar</button>
+            </div>
+          </div>
+
+          <!-- Cards de eficiência -->
+          <div class="grid grid-cols-1 md:grid-cols-4 gap-3 mb-4" id="eficienciaKPIs"></div>
+
+          <!-- Ranking de eficiência -->
+          <div class="grid grid-cols-1 lg:grid-cols-2 gap-3 mb-4">
+            <div class="card rounded-2xl p-3 bg-white shadowMedium">
+              <div class="text-sm font-semibold">Ranking - Melhores médias (km/L)</div>
+              <div class="overflow-auto max-h-60">
+                <table class="min-w-full text-sm">
+                  <thead class="bg-slate-100">
+                    <tr><th class="p-2">Veículo</th><th class="p-2">Média (km/L)</th><th class="p-2">Custo/km (R$)</th></tr>
+                  </thead>
+                  <tbody id="rankingMelhores"></tbody>
+                </table>
+              </div>
+            </div>
+
+            <div class="card rounded-2xl p-3 bg-white shadowMedium">
+              <div class="text-sm font-semibold">Ranking - Piores médias (km/L)</div>
+              <div class="overflow-auto max-h-60">
+                <table class="min-w-full text-sm">
+                  <thead class="bg-slate-100">
+                    <tr><th class="p-2">Veículo</th><th class="p-2">Média (km/L)</th><th class="p-2">Custo/km (R$)</th></tr>
+                  </thead>
+                  <tbody id="rankingPiores"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <!-- Alertas detalhados -->
+          <div class="card rounded-2xl p-3 bg-white shadowMedium">
+            <div class="text-sm font-semibold mb-2">Alertas e Recomendações</div>
+            <div id="alertasDetalhados" class="space-y-2"></div>
+          </div>
+        </div>
+
+        <!-- PAGE: TABELA -->
+        <div id="page-tabela" class="hidden glass shadowMedium card rounded-2xl p-4">
+          <div class="flex items-center justify-between flex-wrap gap-2 mb-3">
+            <div>
+              <div class="text-lg font-semibold">Registros de Abastecimento</div>
+              <div class="text-xs muted">Tabela completa com todos os abastecimentos do período filtrado</div>
+            </div>
+            <div class="flex items-center gap-2">
+              <span class="text-xs muted">Linhas:</span>
+              <select id="pageSize" class="btn px-2 py-1 rounded-xl bg-white text-sm shadowSoft">
+                <option value="25">25</option>
+                <option value="50" selected>50</option>
+                <option value="100">100</option>
+                <option value="250">250</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="overflow-auto border rounded-2xl bg-white shadowMedium">
+            <table class="min-w-full text-sm">
+              <thead class="bg-slate-100 sticky top-0">
+                <tr class="text-left">
+                  <th class="p-2">Data</th>
+                  <th class="p-2">Veículo</th>
+                  <th class="p-2">Motorista</th>
+                  <th class="p-2">Km Inicial</th>
+                  <th class="p-2">Km Final</th>
+                  <th class="p-2">Km Rodados</th>
+                  <th class="p-2">Litros</th>
+                  <th class="p-2">Valor (R$)</th>
+                  <th class="p-2">Média (km/L)</th>
+                  <th class="p-2">Custo/km (R$)</th>
+                </tr>
+              </thead>
+              <tbody id="tabelaBody"></tbody>
+            </table>
+          </div>
+
+          <div class="flex items-center justify-between mt-3">
+            <div class="text-xs muted" id="pagerInfo">—</div>
+            <div class="flex items-center gap-2">
+              <button id="btnPrev" class="btn px-3 py-1.5 rounded-xl bg-white text-sm shadowSoft">Anterior</button>
+              <button id="btnNext" class="btn px-3 py-1.5 rounded-xl bg-white text-sm shadowSoft">Próximo</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- PAGE: ANÁLISE MENSAL -->
+        <div id="page-analise" class="hidden glass shadowMedium card rounded-2xl p-4">
+          <div class="text-lg font-semibold">Análise Mensal</div>
+          <div class="text-xs muted mb-4">Comparativo de consumo e gastos mês a mês</div>
+
+          <div class="grid grid-cols-1 lg:grid-cols-2 gap-3 mb-4">
+            <div class="card rounded-2xl p-3 bg-white shadowMedium">
+              <div class="text-sm font-semibold">Gasto mensal (R$)</div>
+              <canvas id="chartGastoMensal" height="150"></canvas>
+            </div>
+            <div class="card rounded-2xl p-3 bg-white shadowMedium">
+              <div class="text-sm font-semibold">Consumo mensal (L)</div>
+              <canvas id="chartConsumoMensal" height="150"></canvas>
+            </div>
+          </div>
+
+          <div class="card rounded-2xl p-3 bg-white shadowMedium">
+            <div class="text-sm font-semibold mb-2">Tabela comparativa mensal</div>
+            <div class="overflow-auto border rounded-xl shadowSoft">
+              <table class="min-w-full text-sm">
+                <thead class="bg-slate-100">
+                  <tr class="text-left">
+                    <th class="p-2">Mês</th>
+                    <th class="p-2">Abastecimentos</th>
+                    <th class="p-2">Total Litros</th>
+                    <th class="p-2">Total Gasto</th>
+                    <th class="p-2">Km Total</th>
+                    <th class="p-2">Média (km/L)</th>
+                    <th class="p-2">Custo/km (R$)</th>
+                  </tr>
+                </thead>
+                <tbody id="tabelaMensalBody"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <!-- MODAL DE DETALHES -->
+  <div id="detailModal" class="fixed inset-0 bg-black/50 hidden items-center justify-center p-4">
+    <div class="glass shadowStrong card rounded-2xl w-full max-w-4xl p-4">
+      <div class="flex items-center justify-between mb-4">
+        <div>
+          <div class="text-lg font-semibold" id="modalTitle">Detalhes</div>
+          <div class="text-xs muted" id="modalSub"></div>
+        </div>
+        <button id="modalClose" class="btn px-3 py-1.5 rounded-xl bg-white text-sm shadowSoft">Fechar</button>
+      </div>
+      <div id="modalContent"></div>
+    </div>
+  </div>
+
+  <!-- CONTEÚDO PARA IMPRESSÃO -->
+  <div id="printableReport" class="hidden"></div>
+
+<script>
+// ==================== CONFIGURAÇÕES ====================
+const el = (id) => document.getElementById(id);
+
+let rawRecords = [];
+let filteredRecords = [];
+let veiculos = [];
+let motoristas = [];
+
+// Paginação
+let page = 1;
+let pageSize = 50;
+
+// Charts
+let chartGastoDiario, chartConsumoVeiculo, chartMediaVeiculo, chartCustoKm;
+let chartVeiculoMedia, chartVeiculoCusto;
+let chartGastoMensal, chartConsumoMensal;
+
+// Meta de eficiência
+let metaEficiencia = 8;
+
+// Dados fixos de TODOS os carros COM OS NOVOS LANÇAMENTOS
+const dadosFixosTodosCarros = [
+  // Carro 30 (12 registros)
+  ["07/01/2026", "", "30", 34189, 34189, 0, 41.5, 243.6, 0.00],
+  ["12/01/2026", "", "30", 34189, 34403, 214, 28.42, 166.83, 7.53],
+  ["15/01/2026", "", "30", 34403, 34577, 174, 28.87, 169.47, 6.03],
+  ["21/01/2026", "", "30", 34577, 34758, 181, 20.44, 120, 8.86],
+  ["22/01/2026", "", "30", 34758, 34980, 222, 24.64, 144.6, 9.01],
+  ["27/01/2026", "", "30", 34980, 35163, 183, 23.32, 139.69, 7.85],
+  ["28/01/2026", "", "30", 35163, 35240, 77, 26.2, 153.76, 2.94],
+  ["02/02/2026", "", "30", 35240, 35525, 285, 30.15, 174.57, 9.45],
+  ["04/02/2026", "", "30", 35525, 35677, 152, 22.32, 129.29, 6.81],
+  ["06/02/2026", "", "30", 35677, 35814, 137, 25.33, 148.63, 5.41],
+  ["11/02/2026", "", "30", 35814, 36033, 219, 26.24, 154.01, 8.35],
+  ["14/02/2026", "", "30", 36033, 36187, 154, 34.66, 200.68, 4.44],
+
+  // Carro 96 (11 registros)
+  ["22/12/2025", "", "96", 6888, 6888, 0, 34.64, 203.34, 0.00],
+  ["26/12/2025", "", "96", 6888, 7359, 471, 35.48, 208.27, 13.28],
+  ["06/01/2026", "", "96", 7359, 7461, 102, 25.26, 148.28, 4.04],
+  ["12/01/2026", "", "96", 7461, 7725, 264, 32.08, 188.31, 8.23],
+  ["15/01/2026", "", "96", 7725, 7929, 204, 22.87, 134.25, 8.92],
+  ["20/01/2026", "", "96", 7929, 8126, 197, 29.92, 175.63, 6.58],
+  ["26/01/2026", "", "96", 8126, 8423, 297, 35.3, 207.19, 8.41],
+  ["28/01/2026", "", "96", 8423, 8832, 409, 33.58, 201.14, 12.18],
+  ["03/02/2026", "", "96", 8832, 9390, 558, 7.92, 45.86, 70.45],
+  ["05/02/2026", "", "96", 9390, 9710, 320, 40.31, 233.39, 7.94],
+  ["13/02/2026", "", "96", 9710, 10048, 338, 39.52, 231.95, 8.55],
+
+  // Carro 51 (10 registros)
+  ["07/01/2026", "", "51", 76885, 76885, 0, 31.46, 184.61, 0.00],
+  ["12/01/2026", "", "51", 76885, 77132, 247, 33.51, 196.7, 7.37],
+  ["16/01/2026", "", "51", 77132, 77365, 233, 31.31, 183.79, 7.44],
+  ["23/01/2026", "", "51", 77365, 77636, 271, 37.36, 219.29, 7.25],
+  ["26/01/2026", "", "51", 77636, 77731, 95, 13.49, 80.81, 7.04],
+  ["29/01/2026", "", "51", 77731, 77901, 170, 29.4, 172.57, 5.78],
+  ["02/02/2026", "", "51", 77901, 78114, 213, 28.62, 168.0, 7.44],
+  ["05/02/2026", "", "51", 78114, 78358, 244, 16.02, 209.19, 6.85],
+  ["10/02/2026", "", "51", 78358, 78585, 227, 37.96, 204.1, 6.53],
+  ["18/02/2026", "", "51", 78585, 78777, 419, 36.01, 211.34, 11.64],
+
+  // Carro 84 (20 registros)
+  ["11/12/2025", "", "84", 114405, 114405, 0, 33.9, 198.99, 0.00],
+  ["15/12/2025", "", "84", 114405, 114562, 157, 21.32, 125.15, 7.36],
+  ["17/12/2025", "", "84", 114562, 114686, 124, 17.03, 100, 7.28],
+  ["05/01/2026", "", "84", 114686, 115160, 474, 43.61, 256.28, 10.87],
+  ["08/01/2026", "", "84", 115160, 115287, 127, 15.09, 88.58, 8.42],
+  ["09/01/2026", "", "84", 115287, 115565, 278, 24.7, 144.99, 11.26],
+  ["13/01/2026", "", "84", 115565, 115693, 128, 15.65, 91.87, 8.18],
+  ["14/01/2026", "", "84", 115693, 115886, 193, 16.02, 95.09, 12.05],
+  ["15/01/2026", "", "84", 115886, 116309, 423, 37.96, 222.83, 11.14],
+  ["19/01/2026", "", "84", 116309, 116402, 93, 18.97, 111.35, 4.90],
+  ["21/01/2026", "", "84", 116402, 116521, 119, 17.82, 104.6, 6.68],
+  ["22/01/2026", "", "84", 116521, 116541, 20, 15.56, 93.2, 1.29],
+  ["23/01/2026", "", "84", 116541, 116910, 369, 11.71, 185.99, 31.51],
+  ["28/01/2026", "", "84", 116910, 117083, 173, 34.87, 208.87, 4.96],
+  ["02/02/2026", "", "84", 117083, 117570, 487, 41.46, 248.35, 11.75],
+  ["04/02/2026", "", "84", 117570, 117939, 369, 43.35, 251, 8.51],
+  ["06/02/2026", "", "84", 117939, 118090, 151, 23.89, 138.32, 6.32],
+  ["09/02/2026", "", "84", 118090, 118326, 236, 26.8, 155.17, 8.81],
+  ["13/02/2026", "", "84", 118326, 118530, 204, 32.82, 190.03, 6.22],
+  ["18/02/2026", "", "84", 118530, 118866, 336, 40.09, 232.06, 8.38],
+
+  // Carro 97 (9 registros)
+  ["02/01/2026", "", "97", 11675, 11675, 0, 46.42, 271.55, 0.00],
+  ["09/01/2026", "", "97", 11675, 11991, 316, 42.51, 249.53, 7.43],
+  ["13/01/2026", "", "97", 11991, 12247, 256, 30.91, 181.44, 8.28],
+  ["19/01/2026", "", "97", 12247, 12495, 248, 23.4, 137.36, 10.60],
+  ["21/01/2026", "", "97", 12495, 12643, 148, 30.52, 179.16, 4.85],
+  ["28/01/2026", "", "97", 12643, 13000, 357, 38.68, 227.02, 9.23],
+  ["04/02/2026", "", "97", 13000, 13344, 344, 48.86, 286.78, 7.04],
+  ["10/02/2026", "", "97", 13344, 13575, 231, 35.06, 203, 6.59],
+  ["13/02/2026", "", "97", 13575, 13750, 175, 34.56, 200.1, 5.06]
+];
+
+// Função para converter os dados fixos para o formato do sistema
+function converterDadosFixos() {
+  return dadosFixosTodosCarros.map(row => {
+    const dataRaw = row[0];
+    const veiculo = String(row[2]).trim();
+    const motorista = row[1] ? String(row[1]).trim() : '(não informado)';
+    
+    // Converter data
+    let dataISO = '';
+    if (typeof dataRaw === 'string') {
+      dataISO = parseDateBR(dataRaw);
+    }
+    
+    // Valores numéricos
+    const kmInicial = parseFloat(row[3]) || 0;
+    const kmFinal = parseFloat(row[4]) || 0;
+    const kmRodados = parseFloat(row[5]) || 0;
+    const litros = parseFloat(row[6]) || 0;
+    const valor = parseFloat(row[7]) || 0;
+    const media = parseFloat(row[8]) || 0;
+    
+    // Calcular média se necessário
+    let mediaFinal = media;
+    if (mediaFinal === 0 && kmRodados > 0 && litros > 0) {
+      mediaFinal = kmRodados / litros;
+    }
+    
+    return {
+      sheet: 'dados_fixos',
+      data: dataISO,
+      month: monthKey(dataISO),
+      veiculo,
+      motorista,
+      kmInicial,
+      kmFinal,
+      kmRodados,
+      litros,
+      valor,
+      media: mediaFinal
+    };
+  });
+}
+
+// ==================== UTILITÁRIOS ====================
+function toNumber(val) {
+  if (val === null || val === undefined || val === '') return 0;
+  if (typeof val === 'number') return val;
+  
+  // Tratar formato brasileiro (vírgula como decimal)
+  if (typeof val === 'string') {
+    // Se for fórmula do Excel (ex: "=E2-D2")
+    if (val.startsWith('=')) {
+      return 0;
+    }
+    // Substituir vírgula por ponto para decimal
+    const str = val.replace(',', '.').replace(/[^\d.-]/g, '');
+    const num = parseFloat(str);
+    return isNaN(num) ? 0 : num;
+  }
+  
+  return 0;
+}
+
+function normalizeVeiculo(value) {
+  if (value === null || value === undefined || value === '') return '';
+  
+  if (typeof value === 'number') {
+    return String(Math.trunc(value));
+  }
+  
+  let str = String(value).trim();
+  
+  // Se for número como string
+  if (!isNaN(str)) {
+    return String(Math.trunc(parseFloat(str)));
+  }
+  
+  // Remove espaços extras e retorna
+  return str.replace(/\s+/g, '').trim();
+}
+
+function formatMoney(val) {
+  return val.toFixed(2).replace('.', ',');
+}
+
+function formatDateBR(isoDate) {
+  if (!isoDate) return '';
+  const [year, month, day] = isoDate.split('-');
+  return `${day}/${month}/${year}`;
+}
+
+function parseDateBR(dateStr) {
+  if (!dateStr) return '';
+  
+  // Se já estiver no formato ISO
+  if (dateStr.includes('-') && dateStr.split('-')[0].length === 4) {
+    return dateStr;
+  }
+  
+  // Formato brasileiro dd/mm/yyyy
+  if (dateStr.includes('/')) {
+    const parts = dateStr.split('/');
+    if (parts.length === 3) {
+      return `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
+    }
+  }
+  
+  return dateStr;
+}
+
+function monthKey(iso) {
+  return iso ? iso.substring(0, 7) : '';
+}
+
+function monthName(monthKey) {
+  if (!monthKey) return '';
+  const [year, month] = monthKey.split('-');
+  const months = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+  return `${months[parseInt(month)-1]}/${year}`;
+}
+
+function groupBy(arr, keyFn) {
+  const map = new Map();
+  arr.forEach(item => {
+    const key = keyFn(item) || '(vazio)';
+    if (!map.has(key)) map.set(key, []);
+    map.get(key).push(item);
+  });
+  return map;
+}
+
+function sum(arr, fn) {
+  return arr.reduce((acc, item) => acc + fn(item), 0);
+}
+
+function avg(arr, fn) {
+  if (!arr.length) return 0;
+  return sum(arr, fn) / arr.length;
+}
+
+function topN(map, n = 10, sortFn = (a, b) => b[1] - a[1]) {
+  return Array.from(map.entries()).sort(sortFn).slice(0, n);
+}
+
+function debounce(fn, ms) {
+  let timer;
+  return (...args) => {
+    clearTimeout(timer);
+    timer = setTimeout(() => fn(...args), ms);
+  };
+}
+
+function escapeHtml(str) {
+  return String(str || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
+function destroyChart(chart) {
+  if (chart && typeof chart.destroy === 'function') chart.destroy();
+}
+
+// ==================== FUNÇÃO PRINCIPAL DE FILTRO ====================
+function aplicarFiltros() {
+  const veiculo = el('fVeiculo').value;
+  const motorista = el('fMotorista').value;
+  const dataDe = el('fDe').value;
+  const dataAte = el('fAte').value;
+  const mediaMin = parseFloat(el('fMediaMin').value) || 0;
+  const search = el('fSearch').value.toLowerCase().trim();
+  
+  filteredRecords = rawRecords.filter(r => {
+    // Veículo
+    if (veiculo && r.veiculo !== veiculo) return false;
+    
+    // Motorista
+    if (motorista && r.motorista !== motorista) return false;
+    
+    // Data
+    if (dataDe && r.data < dataDe) return false;
+    if (dataAte && r.data > dataAte) return false;
+    
+    // Média mínima
+    if (mediaMin > 0 && r.media < mediaMin) return false;
+    
+    // Busca geral
+    if (search) {
+      const text = `${r.data} ${r.veiculo} ${r.motorista}`.toLowerCase();
+      if (!text.includes(search)) return false;
+    }
+    
+    return true;
+  });
+  
+  // Resetar página
+  page = 1;
+  
+  // Atualizar label do período
+  const datas = filteredRecords.map(r => r.data).filter(Boolean).sort();
+  if (datas.length) {
+    el('periodoFiltrado').textContent = `${formatDateBR(datas[0])} → ${formatDateBR(datas[datas.length-1])}`;
+  } else {
+    el('periodoFiltrado').textContent = 'Nenhum dado';
+  }
+  
+  // Calcular e atualizar custo médio por km geral
+  const totalKm = sum(filteredRecords, r => r.kmRodados);
+  const totalGasto = sum(filteredRecords, r => r.valor);
+  const custoMedioKm = totalKm > 0 ? totalGasto / totalKm : 0;
+  el('avgCustoKm').textContent = `R$ ${formatMoney(custoMedioKm)}/km`;
+  
+  // Renderizar tudo
+  renderizarTudo();
+}
+
+// ==================== CARREGAMENTO DOS DADOS ====================
+async function loadXLSX(file) {
+  const buf = await file.arrayBuffer();
+  const wb = XLSX.read(buf, { type: 'array', cellDates: true, dateNF: 'yyyy-mm-dd' });
+  
+  // Começar com os dados fixos de TODOS os carros (sempre presentes)
+  const dadosFixos = converterDadosFixos();
+  const registrosPlanilha = [];
+
+  console.log('=== INÍCIO DO CARREGAMENTO ===');
+  console.log(`Dados fixos carregados: ${dadosFixos.length} registros`);
+  
+  // Estatísticas por veículo dos dados fixos
+  const veiculosFixos = [...new Set(dadosFixos.map(r => r.veiculo))];
+  console.log('Veículos nos dados fixos:', veiculosFixos);
+  veiculosFixos.forEach(v => {
+    const registros = dadosFixos.filter(r => r.veiculo === v);
+    console.log(`  Carro ${v}: ${registros.length} registros`);
+  });
+  
+  // Processar todas as abas da planilha
+  for (const sheetName of wb.SheetNames) {
+    const ws = wb.Sheets[sheetName];
+    const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '', raw: false });
+    
+    console.log(`Processando aba: ${sheetName}, linhas:`, rows.length);
+    
+    // Encontrar a linha do cabeçalho
+    let headerRow = -1;
+    for (let i = 0; i < Math.min(10, rows.length); i++) {
+      const row = rows[i];
+      if (row && row[0]) {
+        const cell0 = String(row[0]).toLowerCase();
+        if (cell0.includes('data') || cell0.includes('date')) {
+          headerRow = i;
+          break;
+        }
+      }
+    }
+    
+    if (headerRow === -1) {
+      console.log(`Aba ${sheetName}: cabeçalho não encontrado, assumindo linha 0`);
+      headerRow = 0;
+    }
+    
+    console.log(`Cabeçalho encontrado na linha ${headerRow}`);
+    
+    // Processar dados
+    let lastKmFinal = 0;
+    let registrosVeiculo = new Map(); // Para rastrear último km por veículo
+    
+    for (let i = headerRow + 1; i < rows.length; i++) {
+      const row = rows[i];
+      if (!row || row.length < 3) continue;
+      
+      // Pular linhas completamente vazias
+      if (!row[0] && !row[2] && !row[3]) continue;
+      
+      // Extrair dados
+      let dataRaw = row[0];
+      const motorista = String(row[1] || '').trim();
+      const veiculoRaw = row[2];
+      const veiculo = normalizeVeiculo(veiculoRaw);
+      
+      // Pular linhas sem veículo válido
+      if (!veiculo || veiculo === '') {
+        continue;
+      }
+      
+      // Processar valores numéricos (já tratando vírgula)
+      let kmInicial = toNumber(row[3]);
+      let kmFinal = toNumber(row[4]);
+      let kmRodados = toNumber(row[5]);
+      let litros = toNumber(row[6]);
+      let valor = toNumber(row[7]);
+      let media = toNumber(row[8]);
+      
+      // VALIDAÇÕES E CORREÇÕES IMPORTANTES
+      
+      // 1. Se kmInicial for 0 e temos último km do veículo, usar como referência
+      if (kmInicial === 0 && registrosVeiculo.has(veiculo)) {
+        kmInicial = registrosVeiculo.get(veiculo);
+      }
+      
+      // 2. Se kmRodados for 0 mas temos kmInicial e kmFinal válidos, calcular
+      if (kmRodados === 0 && kmFinal > 0 && kmInicial > 0) {
+        kmRodados = kmFinal - kmInicial;
+      }
+      
+      // 3. Se media for 0 mas temos kmRodados e litros, calcular
+      if (media === 0 && kmRodados > 0 && litros > 0) {
+        media = kmRodados / litros;
+      }
+      
+      // 4. Caso especial: primeiro registro com kmInicial = kmFinal (abastecimento sem rodar)
+      // Vamos pular esses registros pois não contribuem para análise de consumo
+      if (kmRodados === 0 && litros > 0) {
+        console.log(`⚠️ Registro ignorado (abastecimento sem km rodado): Veículo ${veiculo}, Data ${dataRaw}, Litros ${litros}`);
+        continue;
+      }
+      
+      // Validar dados mínimos
+      if (litros <= 0 || valor <= 0 || kmRodados <= 0) {
+        continue;
+      }
+      
+      // Se a média calculada for muito diferente da informada, usar a calculada
+      if (media > 0 && kmRodados > 0 && litros > 0) {
+        const mediaCalculada = kmRodados / litros;
+        if (Math.abs(mediaCalculada - media) > 0.5) {
+          console.log(`⚠️ Média divergente: Veículo ${veiculo}, Informada=${media.toFixed(2)}, Calculada=${mediaCalculada.toFixed(2)} - Usando calculada`);
+          media = mediaCalculada;
+        }
+      }
+      
+      // Guardar último km final para referência futura
+      if (kmFinal > 0) {
+        registrosVeiculo.set(veiculo, kmFinal);
+      }
+      
+      // Converter data
+      let dataISO = '';
+      if (dataRaw instanceof Date) {
+        dataISO = dataRaw.toISOString().split('T')[0];
+      } else if (typeof dataRaw === 'number') {
+        try {
+          // Tentar converter número Excel para data
+          const date = new Date((dataRaw - 25569) * 86400 * 1000);
+          if (!isNaN(date.getTime())) {
+            dataISO = date.toISOString().split('T')[0];
+          }
+        } catch (e) {
+          console.warn('Erro ao converter data numérica:', dataRaw);
+        }
+      } else if (typeof dataRaw === 'string') {
+        dataISO = parseDateBR(dataRaw);
+      }
+      
+      if (!dataISO || dataISO.length < 10) {
+        console.warn('Data inválida:', dataRaw);
+        continue;
+      }
+      
+      registrosPlanilha.push({
+        sheet: sheetName,
+        data: dataISO,
+        month: monthKey(dataISO),
+        veiculo,
+        motorista: motorista || '(não informado)',
+        kmInicial,
+        kmFinal,
+        kmRodados,
+        litros,
+        valor,
+        media
+      });
+    }
+  }
+  
+  // COMBINAR OS DADOS: fixos + planilha
+  // Importante: manter TODOS os registros, sem duplicar
+  const todosRegistros = [...dadosFixos, ...registrosPlanilha];
+  
+  console.log('=== RESUMO DO CARREGAMENTO ===');
+  console.log('Registros fixos:', dadosFixos.length);
+  console.log('Registros da planilha:', registrosPlanilha.length);
+  console.log('Total de registros combinados:', todosRegistros.length);
+  
+  // Verificar veículos únicos
+  const veiculosEncontrados = [...new Set(todosRegistros.map(r => r.veiculo))];
+  console.log('Veículos únicos encontrados:', veiculosEncontrados);
+  
+  // Estatísticas por veículo
+  veiculosEncontrados.forEach(v => {
+    const registrosFixos = dadosFixos.filter(r => r.veiculo === v);
+    const registrosPlan = registrosPlanilha.filter(r => r.veiculo === v);
+    const registrosTotal = todosRegistros.filter(r => r.veiculo === v);
+    
+    const totalKm = sum(registrosTotal, r => r.kmRodados);
+    const totalLitros = sum(registrosTotal, r => r.litros);
+    const totalGasto = sum(registrosTotal, r => r.valor);
+    const mediaGeral = totalLitros > 0 ? totalKm / totalLitros : 0;
+    const custoKm = totalKm > 0 ? totalGasto / totalKm : 0;
+    
+    console.log(`Veículo ${v}:`);
+    console.log(`  Fixos: ${registrosFixos.length} registros`);
+    console.log(`  Planilha: ${registrosPlan.length} registros`);
+    console.log(`  Total: ${registrosTotal.length} registros, ${totalKm.toFixed(0)} km, ${totalLitros.toFixed(2)} L, média ${mediaGeral.toFixed(2)} km/L, custo R$ ${custoKm.toFixed(2)}/km`);
+  });
+  
+  return todosRegistros;
+}
+
+// ==================== ATUALIZAR FILTROS ====================
+function atualizarFiltros() {
+  // Extrair veículos e motoristas únicos
+  const veiculoSet = new Set();
+  const motoristaSet = new Set();
+  
+  rawRecords.forEach(r => {
+    if (r.veiculo) veiculoSet.add(r.veiculo);
+    if (r.motorista && r.motorista !== '(não informado)') motoristaSet.add(r.motorista);
+  });
+  
+  veiculos = Array.from(veiculoSet).sort((a, b) => {
+    // Ordenar numericamente
+    const numA = parseInt(a) || 0;
+    const numB = parseInt(b) || 0;
+    return numA - numB;
+  });
+  
+  motoristas = Array.from(motoristaSet).sort((a, b) => String(a).localeCompare(String(b)));
+  
+  console.log('=== FILTROS ATUALIZADOS ===');
+  console.log('Veículos processados para os filtros:', veiculos);
+  console.log('Total de veículos:', veiculos.length);
+  
+  // Preencher selects
+  const fVeiculo = el('fVeiculo');
+  const fMotorista = el('fMotorista');
+  const veiculoSelector = el('veiculoSelector');
+  
+  fVeiculo.innerHTML = '<option value="">(Todos)</option>';
+  fMotorista.innerHTML = '<option value="">(Todos)</option>';
+  veiculoSelector.innerHTML = '<option value="">Selecione um veículo</option>';
+  
+  veiculos.forEach(v => {
+    fVeiculo.innerHTML += `<option value="${escapeHtml(v)}">${escapeHtml(v)}</option>`;
+    veiculoSelector.innerHTML += `<option value="${escapeHtml(v)}">${escapeHtml(v)}</option>`;
+  });
+  
+  motoristas.forEach(m => {
+    fMotorista.innerHTML += `<option value="${escapeHtml(m)}">${escapeHtml(m)}</option>`;
+  });
+  
+  // Atualizar meta de veículos na sidebar
+  el('metaVeiculos').textContent = veiculos.length;
+  
+  // Habilitar botão de exportação se houver dados
+  if (rawRecords.length > 0) {
+    el('btnExportCSV').disabled = false;
+  }
+}
+
+// ==================== RENDERIZAR DASHBOARD ====================
+function renderizarDashboard() {
+  if (!filteredRecords.length) {
+    el('kpiGrid').innerHTML = '<div class="col-span-4 text-center p-4 muted">Nenhum dado com os filtros atuais</div>';
+    return;
+  }
+  
+  // Calcular KPIs
+  const totalAbastecimentos = filteredRecords.length;
+  const totalLitros = sum(filteredRecords, r => r.litros);
+  const totalGasto = sum(filteredRecords, r => r.valor);
+  const totalKm = sum(filteredRecords, r => r.kmRodados);
+  const mediaGeral = totalLitros > 0 ? totalKm / totalLitros : 0;
+  const custoPorKm = totalKm > 0 ? totalGasto / totalKm : 0;
+  
+  el('avgMedia').textContent = mediaGeral.toFixed(2) + ' km/L';
+  el('avgCustoKm').textContent = `R$ ${formatMoney(custoPorKm)}/km`;
+  
+  // KPIs
+  el('kpiGrid').innerHTML = `
+    <div class="card rounded-2xl p-4 bg-white shadowMedium">
+      <div class="text-xs muted">Abastecimentos</div>
+      <div class="text-2xl font-semibold mono">${totalAbastecimentos}</div>
+      <div class="text-xs muted">Total de registros</div>
+    </div>
+    
+    <div class="card rounded-2xl p-4 bg-white shadowMedium">
+      <div class="text-xs muted">Total Litros</div>
+      <div class="text-2xl font-semibold mono">${totalLitros.toFixed(2)} L</div>
+      <div class="text-xs muted">${totalKm.toFixed(0)} km rodados</div>
+    </div>
+    
+    <div class="card rounded-2xl p-4 bg-white shadowMedium">
+      <div class="text-xs muted">Total Gasto</div>
+      <div class="text-2xl font-semibold mono">R$ ${formatMoney(totalGasto)}</div>
+      <div class="text-xs muted">R$ ${formatMoney(custoPorKm)}/km</div>
+    </div>
+    
+    <div class="card rounded-2xl p-4 bg-white shadowMedium">
+      <div class="text-xs muted">Média Geral</div>
+      <div class="text-2xl font-semibold mono">${mediaGeral.toFixed(2)} km/L</div>
+      <div class="text-xs muted">Eficiência média</div>
+    </div>
+  `;
+  
+  // Gráfico: Gasto por dia
+  const gastoPorDia = groupBy(filteredRecords, r => r.data);
+  const gastoDias = Array.from(gastoPorDia.entries())
+    .sort((a, b) => a[0].localeCompare(b[0]))
+    .map(([data, registros]) => ({
+      data,
+      gasto: sum(registros, r => r.valor)
+    }));
+  
+  if (chartGastoDiario) chartGastoDiario.destroy();
+  chartGastoDiario = new Chart(el('chartGastoDiario'), {
+    type: 'line',
+    data: {
+      labels: gastoDias.map(d => formatDateBR(d.data).substring(0, 5)),
+      datasets: [{
+        label: 'Gasto (R$)',
+        data: gastoDias.map(d => d.gasto),
+        borderColor: '#3b82f6',
+        backgroundColor: 'rgba(59, 130, 246, 0.1)',
+        tension: 0.3,
+        fill: true
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: { legend: { display: false } },
+      scales: { y: { beginAtZero: true } }
+    }
+  });
+  el('g1meta').textContent = `${gastoDias.length} dia(s)`;
+  
+  // Gráfico: Consumo por veículo
+  const consumoPorVeiculo = groupBy(filteredRecords, r => r.veiculo);
+  const consumoVeiculos = Array.from(consumoPorVeiculo.entries())
+    .map(([veiculo, registros]) => ({
+      veiculo,
+      litros: sum(registros, r => r.litros)
+    }))
+    .sort((a, b) => b.litros - a.litros)
+    .slice(0, 10);
+  
+  if (chartConsumoVeiculo) chartConsumoVeiculo.destroy();
+  chartConsumoVeiculo = new Chart(el('chartConsumoVeiculo'), {
+    type: 'bar',
+    data: {
+      labels: consumoVeiculos.map(v => v.veiculo),
+      datasets: [{
+        label: 'Litros',
+        data: consumoVeiculos.map(v => v.litros),
+        backgroundColor: '#10b981'
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: { legend: { display: false } },
+      scales: { y: { beginAtZero: true } }
+    }
+  });
+  el('g2meta').textContent = `Top ${consumoVeiculos.length}`;
+  
+  // Gráfico: Média por veículo (calculada corretamente)
+  const mediaPorVeiculo = Array.from(consumoPorVeiculo.entries())
+    .map(([veiculo, registros]) => {
+      const kmTotal = sum(registros, r => r.kmRodados);
+      const litrosTotal = sum(registros, r => r.litros);
+      return {
+        veiculo,
+        media: litrosTotal > 0 ? kmTotal / litrosTotal : 0
+      };
+    })
+    .sort((a, b) => b.media - a.media)
+    .slice(0, 10);
+  
+  if (chartMediaVeiculo) chartMediaVeiculo.destroy();
+  chartMediaVeiculo = new Chart(el('chartMediaVeiculo'), {
+    type: 'bar',
+    data: {
+      labels: mediaPorVeiculo.map(v => v.veiculo),
+      datasets: [{
+        label: 'km/L',
+        data: mediaPorVeiculo.map(v => v.media),
+        backgroundColor: '#8b5cf6'
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: { legend: { display: false } },
+      scales: { y: { beginAtZero: true } }
+    }
+  });
+  el('g3meta').textContent = `Top ${mediaPorVeiculo.length}`;
+  
+  // Gráfico: Custo por km por veículo
+  const custoPorKmVeiculo = Array.from(consumoPorVeiculo.entries())
+    .map(([veiculo, registros]) => {
+      const kmTotal = sum(registros, r => r.kmRodados);
+      const gastoTotal = sum(registros, r => r.valor);
+      return {
+        veiculo,
+        custoKm: kmTotal > 0 ? gastoTotal / kmTotal : 0
+      };
+    })
+    .sort((a, b) => a.custoKm - b.custoKm)
+    .slice(0, 10);
+  
+  if (chartCustoKm) chartCustoKm.destroy();
+  chartCustoKm = new Chart(el('chartCustoKm'), {
+    type: 'bar',
+    data: {
+      labels: custoPorKmVeiculo.map(v => v.veiculo),
+      datasets: [{
+        label: 'R$/km',
+        data: custoPorKmVeiculo.map(v => v.custoKm),
+        backgroundColor: '#f59e0b'
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: { legend: { display: false } },
+      scales: { y: { beginAtZero: true } }
+    }
+  });
+  el('g4meta').textContent = `Top ${custoPorKmVeiculo.length}`;
+  
+  // Top motoristas
+  const motoristaCount = groupBy(filteredRecords.filter(r => r.motorista !== '(não informado)'), r => r.motorista);
+  const topMotoristasArray = topN(motoristaCount, 5);
+  
+  el('topMotoristas').innerHTML = topMotoristasArray.length
+    ? topMotoristasArray.map(([m, registros]) => `
+        <div class="flex justify-between items-center border-b pb-1">
+          <span>${escapeHtml(m)}</span>
+          <span class="mono font-semibold">${registros.length}x</span>
+        </div>
+      `).join('')
+    : '<div class="muted">Nenhum motorista identificado</div>';
+  
+  // Alertas de eficiência
+  const alertas = [];
+  Array.from(consumoPorVeiculo.entries()).forEach(([veiculo, registros]) => {
+    const kmTotal = sum(registros, r => r.kmRodados);
+    const litrosTotal = sum(registros, r => r.litros);
+    const media = litrosTotal > 0 ? kmTotal / litrosTotal : 0;
+    
+    if (media < metaEficiencia && media > 0) {
+      alertas.push({ veiculo, media, registros: registros.length });
+    }
+  });
+  
+  alertas.sort((a, b) => a.media - b.media);
+  
+  el('alertasEficiencia').innerHTML = alertas.length
+    ? alertas.slice(0, 5).map(a => `
+        <div class="efficiency-warning p-2 rounded bg-orange-50">
+          <span class="font-semibold">${escapeHtml(a.veiculo)}</span>
+          <span class="mono">${a.media.toFixed(2)} km/L</span>
+          <span class="text-xs muted">(${a.registros} abast.)</span>
+        </div>
+      `).join('')
+    : '<div class="muted">Nenhum alerta no momento</div>';
+}
+
+// ==================== RENDERIZAR VEÍCULOS ====================
+function renderizarVeiculos() {
+  const veiculoSelector = el('veiculoSelector');
+  const veiculo = veiculoSelector.value;
+  
+  if (!veiculo) {
+    el('veiculoDetail').classList.add('hidden');
+    el('veiculoNoSelection').classList.remove('hidden');
+    return;
+  }
+  
+  el('veiculoDetail').classList.remove('hidden');
+  el('veiculoNoSelection').classList.add('hidden');
+  
+  const registros = filteredRecords.filter(r => r.veiculo === veiculo);
+  
+  if (!registros.length) {
+    el('veiculoKPI').innerHTML = '<div class="col-span-5 text-center muted">Sem dados para este veículo no período filtrado</div>';
+    return;
+  }
+  
+  // Calcular estatísticas
+  const totalAbast = registros.length;
+  const totalLitros = sum(registros, r => r.litros);
+  const totalGasto = sum(registros, r => r.valor);
+  const totalKm = sum(registros, r => r.kmRodados);
+  const mediaGeral = totalLitros > 0 ? totalKm / totalLitros : 0;
+  const custoPorKm = totalKm > 0 ? totalGasto / totalKm : 0;
+  
+  // KPIs
+  el('veiculoKPI').innerHTML = `
+    <div class="card rounded-xl p-2 bg-slate-50 text-center shadowSoft">
+      <div class="text-xs muted">Abastecimentos</div>
+      <div class="text-lg font-semibold mono">${totalAbast}</div>
+    </div>
+    <div class="card rounded-xl p-2 bg-slate-50 text-center shadowSoft">
+      <div class="text-xs muted">Litros</div>
+      <div class="text-lg font-semibold mono">${totalLitros.toFixed(2)} L</div>
+    </div>
+    <div class="card rounded-xl p-2 bg-slate-50 text-center shadowSoft">
+      <div class="text-xs muted">Gasto</div>
+      <div class="text-lg font-semibold mono">R$ ${formatMoney(totalGasto)}</div>
+    </div>
+    <div class="card rounded-xl p-2 bg-slate-50 text-center shadowSoft">
+      <div class="text-xs muted">Média</div>
+      <div class="text-lg font-semibold mono">${mediaGeral.toFixed(2)} km/L</div>
+    </div>
+    <div class="card rounded-xl p-2 bg-slate-50 text-center shadowSoft">
+      <div class="text-xs muted">Custo/km</div>
+      <div class="text-lg font-semibold mono">R$ ${formatMoney(custoPorKm)}</div>
+    </div>
+  `;
+  
+  // Gráfico: Evolução da média
+  const registrosOrdenados = [...registros].sort((a, b) => a.data.localeCompare(b.data));
+  
+  if (chartVeiculoMedia) chartVeiculoMedia.destroy();
+  chartVeiculoMedia = new Chart(el('chartVeiculoMedia'), {
+    type: 'line',
+    data: {
+      labels: registrosOrdenados.map(r => formatDateBR(r.data).substring(0, 5)),
+      datasets: [{
+        label: 'km/L',
+        data: registrosOrdenados.map(r => r.media),
+        borderColor: '#8b5cf6',
+        backgroundColor: 'rgba(139, 92, 246, 0.1)',
+        tension: 0.3,
+        fill: true
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: { legend: { display: false } },
+      scales: { y: { beginAtZero: true } }
+    }
+  });
+  
+  // Gráfico: Custo acumulado
+  let acumulado = 0;
+  const custoAcumulado = registrosOrdenados.map(r => {
+    acumulado += r.valor;
+    return acumulado;
+  });
+  
+  if (chartVeiculoCusto) chartVeiculoCusto.destroy();
+  chartVeiculoCusto = new Chart(el('chartVeiculoCusto'), {
+    type: 'line',
+    data: {
+      labels: registrosOrdenados.map(r => formatDateBR(r.data).substring(0, 5)),
+      datasets: [{
+        label: 'R$',
+        data: custoAcumulado,
+        borderColor: '#10b981',
+        backgroundColor: 'rgba(16, 185, 129, 0.1)',
+        tension: 0.3,
+        fill: true
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: { legend: { display: false } },
+      scales: { y: { beginAtZero: true } }
+    }
+  });
+  
+  // Tabela de registros
+  const tbody = el('veiculoTableBody');
+  tbody.innerHTML = registrosOrdenados.map(r => {
+    const custoKmRegistro = r.kmRodados > 0 ? r.valor / r.kmRodados : 0;
+    return `
+    <tr class="border-t hover:bg-slate-50">
+      <td class="p-2 mono">${formatDateBR(r.data)}</td>
+      <td class="p-2">${escapeHtml(r.motorista)}</td>
+      <td class="p-2 mono">${r.kmInicial.toFixed(0)}</td>
+      <td class="p-2 mono">${r.kmFinal.toFixed(0)}</td>
+      <td class="p-2 mono">${r.kmRodados.toFixed(0)}</td>
+      <td class="p-2 mono">${r.litros.toFixed(2)}</td>
+      <td class="p-2 mono">R$ ${formatMoney(r.valor)}</td>
+      <td class="p-2 mono font-semibold">${r.media.toFixed(2)}</td>
+      <td class="p-2 mono">R$ ${formatMoney(custoKmRegistro)}</td>
+    </tr>
+  `}).join('');
+}
+
+// ==================== RENDERIZAR EFICIÊNCIA ====================
+function renderizarEficiencia() {
+  metaEficiencia = parseFloat(el('metaEficiencia').value) || 8;
+  
+  if (!filteredRecords.length) {
+    el('eficienciaKPIs').innerHTML = '<div class="col-span-4 text-center p-4 muted">Sem dados no período</div>';
+    return;
+  }
+  
+  // Agrupar por veículo
+  const porVeiculo = groupBy(filteredRecords, r => r.veiculo);
+  
+  // Estatísticas por veículo
+  const stats = Array.from(porVeiculo.entries()).map(([veiculo, registros]) => {
+    const kmTotal = sum(registros, r => r.kmRodados);
+    const litrosTotal = sum(registros, r => r.litros);
+    const gastoTotal = sum(registros, r => r.valor);
+    const media = litrosTotal > 0 ? kmTotal / litrosTotal : 0;
+    const custoKm = kmTotal > 0 ? gastoTotal / kmTotal : 0;
+    
+    return { veiculo, kmTotal, litrosTotal, gastoTotal, media, custoKm, registros: registros.length };
+  });
+  
+  // KPIs gerais
+  const totalLitros = sum(filteredRecords, r => r.litros);
+  const totalKm = sum(filteredRecords, r => r.kmRodados);
+  const totalGasto = sum(filteredRecords, r => r.valor);
+  const mediaGeral = totalLitros > 0 ? totalKm / totalLitros : 0;
+  const custoMedioKm = totalKm > 0 ? totalGasto / totalKm : 0;
+  
+  const veiculosAbaixoMeta = stats.filter(s => s.media < metaEficiencia && s.media > 0).length;
+  const melhorMedia = stats.length > 0 ? Math.max(...stats.map(s => s.media)) : 0;
+  const piorMedia = stats.length > 0 ? Math.min(...stats.map(s => s.media > 0 ? s.media : Infinity)) : 0;
+  
+  el('eficienciaKPIs').innerHTML = `
+    <div class="card rounded-2xl p-4 bg-white shadowMedium">
+      <div class="text-xs muted">Média Geral</div>
+      <div class="text-2xl font-semibold mono">${mediaGeral.toFixed(2)} km/L</div>
+      <div class="text-xs muted">${stats.length} veículos</div>
+    </div>
+    
+    <div class="card rounded-2xl p-4 bg-white shadowMedium">
+      <div class="text-xs muted">Custo Médio/km</div>
+      <div class="text-2xl font-semibold mono">R$ ${formatMoney(custoMedioKm)}</div>
+      <div class="text-xs muted">por km rodado</div>
+    </div>
+    
+    <div class="card rounded-2xl p-4 bg-white shadowMedium">
+      <div class="text-xs muted">Abaixo da meta</div>
+      <div class="text-2xl font-semibold mono">${veiculosAbaixoMeta}</div>
+      <div class="text-xs muted">veículos com &lt; ${metaEficiencia} km/L</div>
+    </div>
+    
+    <div class="card rounded-2xl p-4 bg-white shadowMedium">
+      <div class="text-xs muted">Melhor × Pior</div>
+      <div class="text-2xl font-semibold mono">${melhorMedia.toFixed(2)} × ${piorMedia === Infinity ? '—' : piorMedia.toFixed(2)}</div>
+      <div class="text-xs muted">km/L (média)</div>
+    </div>
+  `;
+  
+  // Ranking melhores
+  const melhores = [...stats].filter(s => s.media > 0).sort((a, b) => b.media - a.media).slice(0, 10);
+  el('rankingMelhores').innerHTML = melhores.map(s => `
+    <tr class="border-t hover:bg-slate-50">
+      <td class="p-2">${escapeHtml(s.veiculo)}</td>
+      <td class="p-2 mono font-semibold text-green-600">${s.media.toFixed(2)}</td>
+      <td class="p-2 mono">R$ ${formatMoney(s.custoKm)}</td>
+    </tr>
+  `).join('');
+  
+  // Ranking piores
+  const piores = [...stats].filter(s => s.media > 0).sort((a, b) => a.media - b.media).slice(0, 10);
+  el('rankingPiores').innerHTML = piores.map(s => `
+    <tr class="border-t hover:bg-slate-50">
+      <td class="p-2">${escapeHtml(s.veiculo)}</td>
+      <td class="p-2 mono font-semibold ${s.media < metaEficiencia ? 'text-red-600' : ''}">${s.media.toFixed(2)}</td>
+      <td class="p-2 mono">R$ ${formatMoney(s.custoKm)}</td>
+    </tr>
+  `).join('');
+  
+  // Alertas detalhados
+  const alertas = stats.filter(s => s.media < metaEficiencia && s.media > 0).sort((a, b) => a.media - b.media);
+  
+  el('alertasDetalhados').innerHTML = alertas.length
+    ? alertas.map(a => `
+        <div class="efficiency-critical p-3 bg-red-50 rounded-xl shadowSoft">
+          <div class="flex justify-between items-center">
+            <span class="font-semibold">${escapeHtml(a.veiculo)}</span>
+            <span class="mono text-red-600 font-bold">${a.media.toFixed(2)} km/L</span>
+          </div>
+          <div class="text-sm mt-1">
+            <span class="muted">${a.registros} abastecimentos • ${a.litrosTotal.toFixed(2)} L • R$ ${formatMoney(a.custoKm)}/km</span>
+          </div>
+          <div class="text-xs muted mt-1">
+            Abaixo da meta de ${metaEficiencia} km/L. Recomendação: verificar manutenção ou motorista.
+          </div>
+        </div>
+      `).join('')
+    : '<div class="text-center p-4 muted">Nenhum alerta no momento. Todos os veículos estão acima da meta.</div>';
+}
+
+// ==================== RENDERIZAR TABELA ====================
+function renderizarTabela() {
+  const total = filteredRecords.length;
+  const totalPages = Math.ceil(total / pageSize);
+  page = Math.min(page, totalPages || 1);
+  
+  const start = (page - 1) * pageSize;
+  const end = Math.min(total, start + pageSize);
+  const slice = filteredRecords.slice(start, end);
+  
+  const tbody = el('tabelaBody');
+  tbody.innerHTML = slice.map(r => {
+    const custoKmRegistro = r.kmRodados > 0 ? r.valor / r.kmRodados : 0;
+    return `
+    <tr class="border-t hover:bg-slate-50">
+      <td class="p-2 mono">${formatDateBR(r.data)}</td>
+      <td class="p-2 font-semibold">${escapeHtml(r.veiculo)}</td>
+      <td class="p-2">${escapeHtml(r.motorista)}</td>
+      <td class="p-2 mono">${r.kmInicial.toFixed(0)}</td>
+      <td class="p-2 mono">${r.kmFinal.toFixed(0)}</td>
+      <td class="p-2 mono">${r.kmRodados.toFixed(0)}</td>
+      <td class="p-2 mono">${r.litros.toFixed(2)}</td>
+      <td class="p-2 mono">R$ ${formatMoney(r.valor)}</td>
+      <td class="p-2 mono font-semibold">${r.media.toFixed(2)}</td>
+      <td class="p-2 mono">R$ ${formatMoney(custoKmRegistro)}</td>
+    </tr>
+  `}).join('');
+  
+  el('pagerInfo').textContent = `Página ${page}/${totalPages || 1} • ${start+1}-${end} de ${total}`;
+  el('btnPrev').disabled = page <= 1;
+  el('btnNext').disabled = page >= totalPages;
+}
+
+// ==================== RENDERIZAR ANÁLISE MENSAL ====================
+function renderizarAnaliseMensal() {
+  if (!filteredRecords.length) {
+    el('tabelaMensalBody').innerHTML = '<tr><td colspan="7" class="p-4 text-center muted">Sem dados no período</td></tr>';
+    return;
+  }
+  
+  const porMes = groupBy(filteredRecords, r => r.month);
+  const meses = Array.from(porMes.keys()).sort();
+  
+  const dadosMensais = meses.map(mes => {
+    const registros = porMes.get(mes);
+    const totalLitros = sum(registros, r => r.litros);
+    const totalGasto = sum(registros, r => r.valor);
+    const totalKm = sum(registros, r => r.kmRodados);
+    const media = totalLitros > 0 ? totalKm / totalLitros : 0;
+    const custoKm = totalKm > 0 ? totalGasto / totalKm : 0;
+    
+    return {
+      mes,
+      nome: monthName(mes),
+      abastecimentos: registros.length,
+      litros: totalLitros,
+      gasto: totalGasto,
+      km: totalKm,
+      media,
+      custoKm
+    };
+  });
+  
+  // Gráfico gasto mensal
+  if (chartGastoMensal) chartGastoMensal.destroy();
+  chartGastoMensal = new Chart(el('chartGastoMensal'), {
+    type: 'bar',
+    data: {
+      labels: dadosMensais.map(d => d.nome),
+      datasets: [{
+        label: 'Gasto (R$)',
+        data: dadosMensais.map(d => d.gasto),
+        backgroundColor: '#3b82f6'
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: { legend: { display: false } },
+      scales: { y: { beginAtZero: true } }
+    }
+  });
+  
+  // Gráfico consumo mensal
+  if (chartConsumoMensal) chartConsumoMensal.destroy();
+  chartConsumoMensal = new Chart(el('chartConsumoMensal'), {
+    type: 'bar',
+    data: {
+      labels: dadosMensais.map(d => d.nome),
+      datasets: [{
+        label: 'Litros',
+        data: dadosMensais.map(d => d.litros),
+        backgroundColor: '#10b981'
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: { legend: { display: false } },
+      scales: { y: { beginAtZero: true } }
+    }
+  });
+  
+  // Tabela mensal
+  el('tabelaMensalBody').innerHTML = dadosMensais.map(d => `
+    <tr class="border-t hover:bg-slate-50">
+      <td class="p-2 font-semibold">${d.nome}</td>
+      <td class="p-2 mono">${d.abastecimentos}</td>
+      <td class="p-2 mono">${d.litros.toFixed(2)}</td>
+      <td class="p-2 mono">R$ ${formatMoney(d.gasto)}</td>
+      <td class="p-2 mono">${d.km.toFixed(0)}</td>
+      <td class="p-2 mono">${d.media.toFixed(2)}</td>
+      <td class="p-2 mono">R$ ${formatMoney(d.custoKm)}</td>
+    </tr>
+  `).join('');
+}
+
+// ==================== RENDERIZAR TUDO ====================
+function renderizarTudo() {
+  // Meta
+  metaEficiencia = parseFloat(el('metaEficiencia')?.value) || 8;
+  
+  // Atualizar métricas da sidebar
+  el('metaTotal').textContent = filteredRecords.length || '—';
+  
+  const datas = filteredRecords.map(r => r.data).filter(Boolean).sort();
+  el('metaPeriod').textContent = datas.length ? `${formatDateBR(datas[0])} → ${formatDateBR(datas[datas.length-1])}` : '—';
+  
+  const veiculosUnicos = new Set(filteredRecords.map(r => r.veiculo));
+  el('metaVeiculos').textContent = veiculosUnicos.size || '—';
+  
+  const totalGasto = sum(filteredRecords, r => r.valor);
+  el('metaGasto').textContent = totalGasto ? `R$ ${formatMoney(totalGasto)}` : '—';
+  
+  // Renderizar páginas conforme a página atual
+  const paginaAtiva = document.querySelector('.navBtn.activeNav')?.getAttribute('data-page') || 'dashboard';
+  
+  if (paginaAtiva === 'dashboard') renderizarDashboard();
+  if (paginaAtiva === 'veiculos') renderizarVeiculos();
+  if (paginaAtiva === 'eficiencia') renderizarEficiencia();
+  if (paginaAtiva === 'tabela') renderizarTabela();
+  if (paginaAtiva === 'analise') renderizarAnaliseMensal();
+}
+
+// ==================== EXPORTAÇÃO ====================
+function exportarCSV() {
+  if (!filteredRecords.length) return;
+  
+  const headers = ['Data', 'Veículo', 'Motorista', 'Km Inicial', 'Km Final', 'Km Rodados', 'Litros', 'Valor (R$)', 'Média (km/L)', 'Custo/km (R$)'];
+  const linhas = [headers.join(';')];
+  
+  filteredRecords.forEach(r => {
+    const custoKmRegistro = r.kmRodados > 0 ? r.valor / r.kmRodados : 0;
+    linhas.push([
+      r.data,
+      r.veiculo,
+      r.motorista,
+      r.kmInicial,
+      r.kmFinal,
+      r.kmRodados,
+      r.litros.toFixed(2).replace('.', ','),
+      r.valor.toFixed(2).replace('.', ','),
+      r.media.toFixed(2).replace('.', ','),
+      custoKmRegistro.toFixed(2).replace('.', ',')
+    ].map(v => `"${v}"`).join(';'));
+  });
+  
+  const blob = new Blob([linhas.join('\n')], { type: 'text/csv;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `abastecimento_${new Date().toISOString().split('T')[0]}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+// ==================== IMPRIMIR RELATÓRIO ====================
+function imprimirRelatorio() {
+  if (!filteredRecords.length) {
+    alert('Sem dados para imprimir');
+    return;
+  }
+  
+  const printable = el('printableReport');
+  printable.innerHTML = '';
+  
+  // Estatísticas gerais
+  const totalAbast = filteredRecords.length;
+  const totalLitros = sum(filteredRecords, r => r.litros);
+  const totalGasto = sum(filteredRecords, r => r.valor);
+  const totalKm = sum(filteredRecords, r => r.kmRodados);
+  const mediaGeral = totalLitros > 0 ? totalKm / totalLitros : 0;
+  const custoMedioKm = totalKm > 0 ? totalGasto / totalKm : 0;
+  
+  const datas = filteredRecords.map(r => r.data).filter(Boolean).sort();
+  const periodo = datas.length ? `${formatDateBR(datas[0])} a ${formatDateBR(datas[datas.length-1])}` : 'Todos os dados';
+  
+  let html = `
+    <style>
+      @media print {
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        h1 { text-align: center; color: #0f172a; }
+        .header { text-align: center; margin-bottom: 30px; }
+        .periodo { text-align: center; font-size: 14px; color: #666; margin-bottom: 20px; }
+        .kpi-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; margin: 20px 0; }
+        .kpi-card { border: 1px solid #ccc; padding: 15px; border-radius: 8px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        th { background: #f1f5f9; padding: 8px; text-align: left; }
+        td { border: 1px solid #ddd; padding: 6px; }
+        .footer { margin-top: 30px; font-size: 12px; color: #666; text-align: center; }
+      }
+    </style>
+    
+    <h1>Relatório de Abastecimento - Smart Conecta</h1>
+    
+    <div class="header">
+      Gerado em: ${new Date().toLocaleDateString('pt-BR')} ${new Date().toLocaleTimeString('pt-BR')}
+    </div>
+    
+    <div class="periodo">
+      <strong>Período:</strong> ${periodo}
+    </div>
+    
+    <div class="kpi-grid">
+      <div class="kpi-card">
+        <div>Abastecimentos</div>
+        <div style="font-size: 24px; font-weight: bold;">${totalAbast}</div>
+      </div>
+      <div class="kpi-card">
+        <div>Total Litros</div>
+        <div style="font-size: 24px; font-weight: bold;">${totalLitros.toFixed(2)} L</div>
+      </div>
+      <div class="kpi-card">
+        <div>Total Gasto</div>
+        <div style="font-size: 24px; font-weight: bold;">R$ ${formatMoney(totalGasto)}</div>
+        <div>R$ ${formatMoney(custoMedioKm)}/km</div>
+      </div>
+      <div class="kpi-card">
+        <div>Média Geral</div>
+        <div style="font-size: 24px; font-weight: bold;">${mediaGeral.toFixed(2)} km/L</div>
+      </div>
+    </div>
+    
+    <h3>Registros</h3>
+    <table>
+      <thead>
+        <tr>
+          <th>Data</th>
+          <th>Veículo</th>
+          <th>Motorista</th>
+          <th>Km</th>
+          <th>Litros</th>
+          <th>Valor</th>
+          <th>Média</th>
+          <th>Custo/km</th>
+        </tr>
+      </thead>
+      <tbody>
+  `;
+  
+  filteredRecords.slice(0, 100).forEach(r => {
+    const custoKmRegistro = r.kmRodados > 0 ? r.valor / r.kmRodados : 0;
+    html += `
+      <tr>
+        <td>${formatDateBR(r.data)}</td>
+        <td>${escapeHtml(r.veiculo)}</td>
+        <td>${escapeHtml(r.motorista)}</td>
+        <td>${r.kmRodados.toFixed(0)}</td>
+        <td>${r.litros.toFixed(2)}</td>
+        <td>R$ ${formatMoney(r.valor)}</td>
+        <td>${r.media.toFixed(2)}</td>
+        <td>R$ ${formatMoney(custoKmRegistro)}</td>
+      </tr>
+    `;
+  });
+  
+  if (filteredRecords.length > 100) {
+    html += `<tr><td colspan="8" style="text-align: center;">..... e mais ${filteredRecords.length - 100} registros</td></tr>`;
+  }
+  
+  html += `
+      </tbody>
+    </table>
+    
+    <div class="footer">
+      Relatório gerado pelo Smart Conecta - Abastecimento & Frota
+    </div>
+  `;
+  
+  printable.innerHTML = html;
+  
+  // Abrir janela de impressão
+  const printWin = window.open('', '_blank');
+  printWin.document.write(`
+    <html>
+      <head>
+        <title>Relatório de Abastecimento</title>
+      </head>
+      <body>
+        ${printable.innerHTML}
+        <script>
+          window.onload = function() { window.print(); setTimeout(() => window.close(), 1000); };
+        <\/script>
+      </body>
+    </html>
+  `);
+  printWin.document.close();
+}
+
+// ==================== NAVEGAÇÃO ====================
+const navBtns = document.querySelectorAll('.navBtn');
+const pages = {
+  dashboard: el('page-dashboard'),
+  veiculos: el('page-veiculos'),
+  eficiencia: el('page-eficiencia'),
+  tabela: el('page-tabela'),
+  analise: el('page-analise')
+};
+
+function mostrarPagina(pageKey) {
+  Object.entries(pages).forEach(([key, node]) => {
+    if (node) {
+      node.classList.toggle('hidden', key !== pageKey);
+    }
+  });
+  
+  navBtns.forEach(btn => {
+    btn.classList.toggle('activeNav', btn.getAttribute('data-page') === pageKey);
+  });
+  
+  renderizarTudo();
+}
+
+navBtns.forEach(btn => {
+  btn.addEventListener('click', () => mostrarPagina(btn.getAttribute('data-page')));
+});
+
+// ==================== EVENTOS ====================
+el('fileInput').addEventListener('change', async (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  
+  el('dotStatus').className = 'w-2.5 h-2.5 rounded-full bg-amber-500';
+  el('statusLine').textContent = 'Carregando...';
+  
+  try {
+    rawRecords = await loadXLSX(file);
+    
+    if (!rawRecords.length) {
+      throw new Error('Nenhum dado válido encontrado');
+    }
+    
+    atualizarFiltros();
+    el('dotStatus').className = 'w-2.5 h-2.5 rounded-full bg-emerald-500';
+    el('statusLine').textContent = `${file.name} • ${rawRecords.length} registros • ${veiculos.length} veículos (incluindo dados fixos)`;
+    
+    // Resetar filtros
+    el('fVeiculo').value = '';
+    el('fMotorista').value = '';
+    el('fDe').value = '';
+    el('fAte').value = '';
+    el('fMediaMin').value = '8';
+    el('fSearch').value = '';
+    
+    aplicarFiltros();
+  } catch (err) {
+    console.error('Erro ao carregar:', err);
+    el('dotStatus').className = 'w-2.5 h-2.5 rounded-full bg-rose-500';
+    el('statusLine').textContent = `Erro: ${err.message}`;
+    rawRecords = [];
+    filteredRecords = [];
+    renderizarTudo();
+  }
+  
+  e.target.value = '';
+});
+
+el('btnReset').addEventListener('click', () => {
+  el('fVeiculo').value = '';
+  el('fMotorista').value = '';
+  el('fDe').value = '';
+  el('fAte').value = '';
+  el('fMediaMin').value = '8';
+  el('fSearch').value = '';
+  aplicarFiltros();
+});
+
+el('btnExportCSV').addEventListener('click', exportarCSV);
+el('btnPrint').addEventListener('click', imprimirRelatorio);
+
+// Eventos de filtro
+el('fVeiculo').addEventListener('change', aplicarFiltros);
+el('fMotorista').addEventListener('change', aplicarFiltros);
+el('fDe').addEventListener('change', aplicarFiltros);
+el('fAte').addEventListener('change', aplicarFiltros);
+el('fMediaMin').addEventListener('change', aplicarFiltros);
+el('fSearch').addEventListener('input', debounce(aplicarFiltros, 300));
+
+// Eventos de eficiência
+el('btnAtualizarEficiencia').addEventListener('click', () => {
+  renderizarEficiencia();
+});
+
+// Eventos de veículo
+el('veiculoSelector').addEventListener('change', renderizarVeiculos);
+
+// Paginação
+el('pageSize').addEventListener('change', (e) => {
+  pageSize = parseInt(e.target.value);
+  page = 1;
+  renderizarTabela();
+});
+
+el('btnPrev').addEventListener('click', () => {
+  page = Math.max(1, page - 1);
+  renderizarTabela();
+});
+
+el('btnNext').addEventListener('click', () => {
+  page = page + 1;
+  renderizarTabela();
+});
+
+// Modal
+el('modalClose').addEventListener('click', () => {
+  el('detailModal').classList.add('hidden');
+});
+
+el('detailModal').addEventListener('click', (e) => {
+  if (e.target === el('detailModal')) {
+    el('detailModal').classList.add('hidden');
+  }
+});
+
+// Tecla / para buscar
+document.addEventListener('keydown', (e) => {
+  if (e.key === '/') {
+    e.preventDefault();
+    el('fSearch').focus();
+  }
+  if (e.key === 'Escape') {
+    el('detailModal').classList.add('hidden');
+  }
+});
+
+// Inicialização com os dados fixos
+function inicializar() {
+  // Carregar dados fixos de TODOS os carros na inicialização
+  rawRecords = converterDadosFixos();
+  console.log('Dados fixos carregados na inicialização:', rawRecords.length, 'registros');
+  
+  const veiculosUnicos = [...new Set(rawRecords.map(r => r.veiculo))];
+  console.log('Veículos nos dados fixos:', veiculosUnicos);
+  
+  atualizarFiltros();
+  el('dotStatus').className = 'w-2.5 h-2.5 rounded-full bg-emerald-500';
+  el('statusLine').textContent = `Dados fixos: ${rawRecords.length} registros • ${veiculosUnicos.length} veículos (30, 51, 84, 96, 97)`;
+  
+  aplicarFiltros();
+  mostrarPagina('dashboard');
+}
+
+// Chamar inicialização
+inicializar();
+</script>
+</body>
+</html>
