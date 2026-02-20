@@ -8,6 +8,10 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  
+  <!-- APENAS jsPDF - sem html2canvas -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
 
   <style>
     .glass { background: rgba(255,255,255,.72); backdrop-filter: blur(10px); }
@@ -54,6 +58,128 @@
         width: 100%;
       }
     }
+    
+    /* Loading overlay */
+    #pdfLoadingOverlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0,0,0,0.7);
+      display: none;
+      justify-content: center;
+      align-items: center;
+      z-index: 9999;
+      flex-direction: column;
+      color: white;
+    }
+    .spinner {
+      border: 4px solid rgba(255,255,255,0.3);
+      border-radius: 50%;
+      border-top: 4px solid white;
+      width: 40px;
+      height: 40px;
+      animation: spin 1s linear infinite;
+      margin-bottom: 15px;
+    }
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    
+    /* Estilos para concatenação de clientes */
+    .concat-chip {
+      background-color: #e0f2fe;
+      border: 1px solid #7dd3fc;
+      color: #0369a1;
+      padding: 2px 8px;
+      border-radius: 16px;
+      font-size: 11px;
+      font-weight: 500;
+    }
+    
+    /* Estilos para o modal de unidades */
+    .unit-card {
+      border-left: 3px solid #3b82f6;
+      transition: all 0.2s;
+    }
+    .unit-card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 10px 25px -5px rgba(0,0,0,0.1);
+    }
+    
+    /* Estilos para análise agregada no drill-down */
+    .analysis-card {
+      background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+      border-left: 4px solid #0ea5e9;
+    }
+    .progress-bar {
+      height: 8px;
+      background: #e2e8f0;
+      border-radius: 4px;
+      overflow: hidden;
+    }
+    .progress-fill {
+      height: 100%;
+      background: #0ea5e9;
+      border-radius: 4px;
+      transition: width 0.3s ease;
+    }
+    .insight-badge {
+      background: #f0f9ff;
+      border: 1px solid #bae6fd;
+      color: #0369a1;
+      padding: 4px 8px;
+      border-radius: 12px;
+      font-size: 11px;
+      font-weight: 500;
+    }
+    .insight-critical {
+      background: #fef2f2;
+      border: 1px solid #fecaca;
+      color: #b91c1c;
+    }
+    .insight-warning {
+      background: #fffbeb;
+      border: 1px solid #fed7aa;
+      color: #b45309;
+    }
+
+    /* Ajustes para o modal caber na tela */
+    #drillModal .max-w-6xl {
+      max-height: 90vh;
+      overflow-y: auto;
+    }
+    
+    #drillModal .grid-cols-1.lg\:grid-cols-3 {
+      max-height: calc(90vh - 120px);
+      overflow-y: auto;
+    }
+    
+    #dAggregatedAnalysis {
+      max-height: 500px;
+      overflow-y: auto;
+      padding-right: 8px;
+    }
+    
+    #dAggregatedAnalysis::-webkit-scrollbar {
+      width: 6px;
+    }
+    
+    #dAggregatedAnalysis::-webkit-scrollbar-track {
+      background: #f1f1f1;
+      border-radius: 10px;
+    }
+    
+    #dAggregatedAnalysis::-webkit-scrollbar-thumb {
+      background: #cbd5e1;
+      border-radius: 10px;
+    }
+    
+    #dAggregatedAnalysis::-webkit-scrollbar-thumb:hover {
+      background: #94a3b8;
+    }
   </style>
 </head>
 
@@ -63,6 +189,12 @@
     <div class="absolute inset-0 bg-gradient-to-br from-slate-950 via-slate-950 to-slate-900"></div>
     <div class="absolute -top-24 -left-24 w-[520px] h-[520px] rounded-full blur-3xl opacity-35 bg-gradient-to-br from-emerald-400 to-cyan-400"></div>
     <div class="absolute -bottom-24 -right-24 w-[520px] h-[520px] rounded-full blur-3xl opacity-30 bg-gradient-to-br from-fuchsia-400 to-indigo-400"></div>
+  </div>
+
+  <!-- Loading Overlay para PDF -->
+  <div id="pdfLoadingOverlay">
+    <div class="spinner"></div>
+    <div id="pdfLoadingMessage">Gerando relatório PDF...</div>
   </div>
 
   <div class="max-w-[1400px] mx-auto px-4 py-4">
@@ -100,14 +232,11 @@
 
         <button id="btnReset" class="btn px-3 py-2 rounded-xl bg-white text-sm shadowSoft">Reset</button>
 
-        <button id="btnExportCSV" class="btn px-3 py-2 rounded-xl bg-white text-sm disabled:opacity-50 shadowSoft" disabled>CSV</button>
-        <button id="btnExportJSON" class="btn px-3 py-2 rounded-xl bg-white text-sm disabled:opacity-50 shadowSoft" disabled>JSON</button>
+        <button id="btnExportCSV" class="btn px-3 py-2 rounded-xl bg-white disabled:opacity-50 shadowSoft" disabled>CSV</button>
+        <button id="btnExportJSON" class="btn px-3 py-2 rounded-xl bg-white disabled:opacity-50 shadowSoft" disabled>JSON</button>
       </div>
     </header>
 
-    <!-- Resto do código permanece igual... -->
-    <!-- ... -->
-    
     <div class="grid grid-cols-1 lg:grid-cols-12 gap-4 mt-4">
       <!-- SIDEBAR -->
       <aside class="lg:col-span-3">
@@ -193,6 +322,18 @@
             <select id="fCliente" class="mt-1 w-full px-3 py-2 rounded-xl border bg-white shadowSoft">
               <option value="">(Todos)</option>
             </select>
+            
+            <!-- NOVO: Opção de concatenar clientes -->
+            <div class="mt-2 flex items-center gap-2">
+              <input type="checkbox" id="concatClientes" class="rounded border-slate-300">
+              <label for="concatClientes" class="text-xs text-slate-700 cursor-pointer flex items-center gap-1">
+                <span class="concat-chip text-[10px] px-2 py-0.5">NOVO</span>
+                <span>Concatenar clientes (ex: VIBRA = todas unidades)</span>
+              </label>
+            </div>
+            <div class="text-[10px] muted mt-1 ml-5">
+              Agrupa clientes com mesmo nome base (ex: "VIVAZ" + "VIVAZ NORTE" + "VIVAZ SUL")
+            </div>
           </div>
 
           <div class="mt-3">
@@ -263,6 +404,16 @@
               <div class="text-xs muted">KPIs do recorte + mix + equipamentos + saúde por equipamento</div>
             </div>
             <div class="flex items-center gap-2 flex-wrap">
+              <!-- BOTÃO DE RELATÓRIO PDF - SÓ APARECE QUANDO UM CLIENTE ESTÁ SELECIONADO -->
+              <div id="pdfReportButtonContainer" class="hidden">
+                <button id="btnGeneratePDF" class="btn px-4 py-2 rounded-xl bg-blue-600 text-white text-sm shadowSoft hover:shadowMedium flex items-center gap-2">
+                  <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3M3 17V7a2 2 0 012-2h6l2 2h6a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z" />
+                  </svg>
+                  Extrair Relatório PDF
+                </button>
+              </div>
+              
               <div class="chip rounded-xl px-3 py-2 bg-white text-xs shadowSoft">
                 <span class="muted">Mês detectado:</span> <span class="mono font-semibold" id="currentMonthLabel">—</span>
               </div>
@@ -554,10 +705,10 @@
     </div>
   </div>
 
-  <!-- DRILL MODAL -->
-  <div id="drillModal" class="fixed inset-0 bg-black/50 hidden items-center justify-center p-4">
-    <div class="glass shadowStrong card rounded-2xl w-full max-w-6xl p-0 overflow-hidden">
-      <div class="px-4 py-3 border-b bg-white flex items-start justify-between gap-3">
+  <!-- DRILL MODAL - AJUSTADO PARA CABER NA TELA -->
+  <div id="drillModal" class="fixed inset-0 bg-black/50 hidden items-center justify-center p-4 z-50">
+    <div class="glass shadowStrong card rounded-2xl w-full max-w-6xl max-h-[90vh] overflow-hidden flex flex-col">
+      <div class="px-4 py-3 border-b bg-white flex items-start justify-between gap-3 flex-shrink-0">
         <div>
           <div class="text-lg font-semibold" id="dTitle">Drill-down</div>
           <div class="text-xs muted" id="dSub">—</div>
@@ -565,38 +716,41 @@
         <button id="dClose" class="btn px-3 py-1.5 rounded-xl bg-white text-sm shadowSoft">Fechar</button>
       </div>
 
-      <div class="p-4 grid grid-cols-1 lg:grid-cols-3 gap-3">
+      <div class="p-4 grid grid-cols-1 lg:grid-cols-3 gap-3 overflow-y-auto flex-1">
         <div class="card rounded-2xl p-3 bg-white shadowMedium">
           <div class="text-xs muted">KPIs</div>
           <div id="dKpis" class="mt-2 space-y-1 text-sm"></div>
         </div>
 
-        <div class="card rounded-2xl p-3 bg-white lg:col-span-2 shadowMedium">
-          <div class="flex items-center justify-between">
-            <div class="text-sm font-semibold">Linha do tempo</div>
+        <div class="card rounded-2xl p-3 bg-white lg:col-span-2 shadowMedium flex flex-col" style="max-height: 500px;">
+          <div class="flex items-center justify-between flex-shrink-0">
+            <div class="text-sm font-semibold">Análise Agregada do Cliente</div>
             <div class="text-xs muted" id="dMeta">—</div>
           </div>
-          <canvas id="dChart" height="110"></canvas>
+          <div id="dAggregatedAnalysis" class="mt-2 flex-1 overflow-y-auto pr-1" style="max-height: 440px;"></div>
         </div>
 
         <div class="card rounded-2xl p-3 bg-white shadowMedium">
-          <div class="text-sm font-semibold">Top clientes</div>
-          <div id="dTopClients" class="mt-2 space-y-1 text-sm"></div>
+          <div class="text-sm font-semibold">Top clientes (unidades)</div>
+          <div id="dTopClients" class="mt-2 space-y-1 text-sm max-h-[200px] overflow-y-auto"></div>
         </div>
 
         <div class="card rounded-2xl p-3 bg-white shadowMedium">
           <div class="text-sm font-semibold">Top motivos</div>
-          <div id="dTopReasons" class="mt-2 space-y-1 text-sm"></div>
+          <div id="dTopReasons" class="mt-2 space-y-1 text-sm max-h-[200px] overflow-y-auto"></div>
         </div>
 
         <div class="card rounded-2xl p-3 bg-white shadowMedium">
           <div class="text-sm font-semibold">Top equipamentos</div>
-          <div id="dTopEquip" class="mt-2 space-y-1 text-sm"></div>
+          <div id="dTopEquip" class="mt-2 space-y-1 text-sm max-h-[200px] overflow-y-auto"></div>
         </div>
       </div>
 
-      <div class="px-4 py-3 border-t bg-white text-xs muted">
-        Reincidência: mesmo cliente + motivo similar dentro da janela configurada.
+      <div class="px-4 py-3 border-t bg-white text-xs muted flex-shrink-0">
+        <div class="flex items-center justify-between">
+          <span>Reincidência: mesmo cliente + motivo similar dentro da janela configurada.</span>
+          <span id="dTimestamp" class="text-[10px]"></span>
+        </div>
       </div>
     </div>
   </div>
@@ -608,8 +762,9 @@
 
 <script>
 /* =========================
-   BASE
+   CONFIGURAÇÃO INICIAL
 ========================= */
+
 const FIXED_FIELDS = new Set([
   "Data","Empresa","Chamados","Chamado","Cliente","Cliente/Empresa","Motivo","tecnico","Técnico","Tecnico",
   "Ajudante","carro","Acrescimo","Acréscimo","Hora Inicio","Hora Final","Tipo de chamado","Tipo",
@@ -649,6 +804,12 @@ function toISODate(v){
   const m2 = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
   if (m2) return s;
   return "";
+}
+
+function formatDateBR(iso) {
+  if (!iso) return '';
+  const [year, month, day] = iso.split('-');
+  return `${day}/${month}/${year}`;
 }
 
 function daysBetween(isoA, isoB){
@@ -730,6 +891,7 @@ const wrapEquip   = el("wrapEquip");
 
 const clientSearch = el("clientSearch");
 const clientSuggest= el("clientSuggest");
+const concatClientes = el("concatClientes"); // NOVO
 
 const kpiGrid = el("kpiGrid");
 const currentMonthLabel = el("currentMonthLabel");
@@ -777,6 +939,10 @@ const acrescCliente = el("acrescCliente");
 const acrescSummary = el("acrescSummary");
 const acrescTableBody = el("acrescTableBody");
 
+// Loading overlay
+const pdfLoadingOverlay = el("pdfLoadingOverlay");
+const pdfLoadingMessage = el("pdfLoadingMessage");
+
 // Drill
 const drillModal = el("drillModal");
 const dClose = el("dClose");
@@ -787,6 +953,8 @@ const dKpis  = el("dKpis");
 const dTopClients = el("dTopClients");
 const dTopReasons = el("dTopReasons");
 const dTopEquip   = el("dTopEquip");
+const dAggregatedAnalysis = el("dAggregatedAnalysis");
+const dTimestamp = el("dTimestamp");
 
 // ==================== FUNÇÃO PARA ABRIR ABASTECIMENTO ====================
 btnAbastecimento.addEventListener("click", () => {
@@ -875,6 +1043,48 @@ function detectEquipColumns(records){
 }
 
 /* =========================
+   FUNÇÃO PARA CONCATENAR CLIENTES (CORRIGIDA)
+========================= */
+function normalizeClientName(cliente) {
+  if (!cliente) return "";
+  
+  // Lista expandida de palavras-base que devem ser agrupadas
+  const baseNames = [
+    "VIVAZ", "VIVA", "VIVO", "TIM", "OI", "CLARO", "NET", "SKY",
+    "VIBRA", "CYRELA", "ALL", "EASY", "BR", "AMERICANAS", "MAGAZINE", 
+    "MERCADO", "LIVRE", "IFOOD", "UBER", "99", "LOFT", "QUINTO", 
+    "ANDAR", "LOCALIZA", "MOVIDA", "UNIMED", "BRADESCO", "ITAU", 
+    "SANTANDER", "CAIXA", "BANCO", "CARREFOUR", "WALMART", "ATACADAO",
+    "ASSAI", "REDE", "DROGAS", "RAIA", "PAGUE", "MENOS"
+  ];
+  
+  const clienteUpper = cliente.trim().toUpperCase();
+  
+  // Verificar se o cliente começa com alguma das palavras-base
+  for (const base of baseNames) {
+    if (clienteUpper.startsWith(base)) {
+      return base;
+    }
+  }
+  
+  // Se não encontrar, pegar a primeira palavra (pode ser o nome base)
+  const primeiraParte = clienteUpper.split(/\s+/)[0];
+  
+  // Se a primeira parte tiver 3 letras ou mais, considerar como base
+  if (primeiraParte.length >= 3) {
+    return primeiraParte;
+  }
+  
+  // Se não, retorna o cliente completo
+  return cliente.trim();
+}
+
+function getEffectiveClient(cliente) {
+  if (!concatClientes || !concatClientes.checked) return cliente;
+  return normalizeClientName(cliente);
+}
+
+/* =========================
    SISTEMA DE ALERTAS
 ========================= */
 function detectAlerts() {
@@ -891,10 +1101,10 @@ function detectAlerts() {
     return;
   }
   
-  // Agrupar por cliente
+  // Agrupar por cliente (considerando concatenação)
   const byClient = new Map();
   for (const r of manutencaoRecords) {
-    const key = r.cliente || "(vazio)";
+    const key = getEffectiveClient(r.cliente) || "(vazio)";
     if (!byClient.has(key)) byClient.set(key, []);
     byClient.get(key).push(r);
   }
@@ -1542,10 +1752,10 @@ function analyzeAcrescimos() {
     return;
   }
   
-  // Agrupar por cliente
+  // Agrupar por cliente (considerando concatenação)
   const byClient = new Map();
   recordsWithAcresc.forEach(r => {
-    const key = r.cliente || "(vazio)";
+    const key = getEffectiveClient(r.cliente) || "(vazio)";
     if (!byClient.has(key)) byClient.set(key, []);
     byClient.get(key).push(r);
   });
@@ -1568,7 +1778,7 @@ function analyzeAcrescimos() {
       
       // Buscar próximo chamado para este cliente (pode ser qualquer tipo, ou filtrado por tipo)
       const nextRecords = filtered.filter(r => 
-        (r.cliente || "(vazio)") === cliente &&
+        getEffectiveClient(r.cliente) === cliente &&
         r.data && r.data > current.data &&
         (!tipoFiltro || r.tipo === tipoFiltro) &&
         r.chamado !== current.chamado // Não é o mesmo chamado
@@ -1716,7 +1926,13 @@ function applyFilters(){
 
   filtered = rawRecords.filter(r=>{
     if (base && r.base !== base) return false;
-    if (c && r.cliente !== c) return false;
+    if (c) {
+      // Se concatenação estiver ativa, comparar pelo nome base
+      const clientMatch = concatClientes && concatClientes.checked 
+        ? normalizeClientName(r.cliente) === c
+        : r.cliente === c;
+      if (!clientMatch) return false;
+    }
     if (t && r.tecnico !== t) return false;
     if (tp && r.tipo !== tp) return false;
 
@@ -1809,14 +2025,14 @@ function renderMonthlyComparison() {
 function renderSingleMonthDetailedAnalysis(month) {
   const monthRecords = filtered.filter(r => r.month === month);
   
-  // 1. Qual cliente do mês teve mais manutenção?
+  // 1. Qual cliente do mês teve mais manutenção? (considerando concatenação)
   const manutencaoRecords = monthRecords.filter(r => r.tipo === "Manutenção");
-  const clienteManutCount = groupCount(manutencaoRecords, r => r.cliente || "(vazio)");
+  const clienteManutCount = groupCount(manutencaoRecords, r => getEffectiveClient(r.cliente) || "(vazio)");
   const topClienteManut = topN(clienteManutCount, 1)[0] || ["Nenhum", 0];
   
-  // 2. Qual cliente do mês teve mais montagem?
+  // 2. Qual cliente do mês teve mais montagem? (considerando concatenação)
   const montagemRecords = monthRecords.filter(r => r.tipo === "Montagem");
-  const clienteMontCount = groupCount(montagemRecords, r => r.cliente || "(vazio)");
+  const clienteMontCount = groupCount(montagemRecords, r => getEffectiveClient(r.cliente) || "(vazio)");
   const topClienteMont = topN(clienteMontCount, 1)[0] || ["Nenhum", 0];
   
   // 3. Qual equipamento do mês X deu mais problemas?
@@ -2201,7 +2417,7 @@ function calcReinc(records){
 
   const byClient = new Map();
   for (const r of records){
-    const key = r.cliente || "(vazio)";
+    const key = getEffectiveClient(r.cliente) || "(vazio)";
     if (!byClient.has(key)) byClient.set(key, []);
     byClient.get(key).push(r);
   }
@@ -2385,7 +2601,12 @@ function renderDominantEquip(){
     const s = fSearch.value.trim().toLowerCase();
 
     if (base && r.base !== base) return false;
-    if (c && r.cliente !== c) return false;
+    if (c) {
+      const clientMatch = concatClientes && concatClientes.checked 
+        ? normalizeClientName(r.cliente) === c
+        : r.cliente === c;
+      if (!clientMatch) return false;
+    }
     if (t && r.tecnico !== t) return false;
     if (de && r.data && r.data < de) return false;
     if (ate && r.data && r.data > ate) return false;
@@ -2483,7 +2704,12 @@ function renderEquipHealth(){
     const s = fSearch.value.trim().toLowerCase();
 
     if (base && r.base !== base) return false;
-    if (c && r.cliente !== c) return false;
+    if (c) {
+      const clientMatch = concatClientes && concatClientes.checked 
+        ? normalizeClientName(r.cliente) === c
+        : r.cliente === c;
+      if (!clientMatch) return false;
+    }
     if (t && r.tecnico !== t) return false;
     if (de && r.data && r.data < de) return false;
     if (ate && r.data && r.data > ate) return false;
@@ -2640,7 +2866,7 @@ function renderEquipHealth(){
 
 function postDeliveryMaintenance(records, equipCol, windowDays=14){
   const byKey = new Map();
-  const keyFn = (r)=> `${r.base||""}||${r.cliente||"(vazio)"}||${equipCol}`;
+  const keyFn = (r)=> `${r.base||""}||${getEffectiveClient(r.cliente)||"(vazio)"}||${equipCol}`;
 
   for (const r of records){
     if (!r.data) continue;
@@ -2649,7 +2875,7 @@ function postDeliveryMaintenance(records, equipCol, windowDays=14){
     if (r.tipo !== "Montagem" && r.tipo !== "Manutenção") continue;
 
     const k = keyFn(r);
-    if (!byKey.has(k)) byKey.set(k, {cliente:r.cliente||"(vazio)", base:r.base||"", montagens:[], manut:[]});
+    if (!byKey.has(k)) byKey.set(k, {cliente:getEffectiveClient(r.cliente)||"(vazio)", base:r.base||"", montagens:[], manut:[]});
     if (r.tipo === "Montagem") byKey.get(k).montagens.push(r.data);
     if (r.tipo === "Manutenção") byKey.get(k).manut.push(r.data);
   }
@@ -2747,7 +2973,8 @@ function buildCharts(){
   destroyIfExists(chart3);
   if (mod === "operacoes"){
     el("g3title").textContent = "Top clientes (volume)";
-    const byClient = groupCount(filtered, r=>r.cliente || "(vazio)");
+    // Usar clientes concatenados se ativo
+    const byClient = groupCount(filtered, r => concatClientes && concatClientes.checked ? getEffectiveClient(r.cliente) : r.cliente || "(vazio)");
     const clientTop = topN(byClient, 10);
     el("g3meta").textContent = `Top ${clientTop.length}`;
     chart3 = new Chart(el("chart3"), {
@@ -2848,13 +3075,300 @@ function renderTable(){
   btnNext.classList.toggle("opacity-50", btnNext.disabled);
 }
 
+/* =========================
+   NOVA FUNÇÃO: Análise Agregada por Cliente no Drill-down
+========================= */
+function renderAggregatedAnalysis(recs, container, clienteNome) {
+  // Estatísticas gerais
+  const total = recs.length;
+  const montagem = recs.filter(r => r.tipo === "Montagem").length;
+  const manutencao = recs.filter(r => r.tipo === "Manutenção").length;
+  const retirada = recs.filter(r => r.tipo === "Retirada").length;
+  const troca = recs.filter(r => r.tipo === "Troca").length;
+  const revisao = recs.filter(r => r.tipo === "Revisão").length;
+  
+  const acrescimos = recs.reduce((sum, r) => sum + (r.acrescimo || 0), 0);
+  const equipSoma = sumEquip(recs);
+  const reincidencia = calcReinc(recs);
+  
+  // Distribuição por tipo (porcentagem)
+  const distribTipo = [
+    { tipo: "Montagem", count: montagem, cor: "#10b981" },
+    { tipo: "Manutenção", count: manutencao, cor: "#ef4444" },
+    { tipo: "Retirada", count: retirada, cor: "#f59e0b" },
+    { tipo: "Troca", count: troca, cor: "#8b5cf6" },
+    { tipo: "Revisão", count: revisao, cor: "#3b82f6" }
+  ].filter(d => d.count > 0);
+  
+  // Calcular manutenções que ocorreram até X dias após montagem (janela configurada)
+  const win = Math.max(1, toInt(healthWindowDays.value));
+  const flagged = [];
+  
+  // Agrupar por cliente + equipamento
+  const byEquipKey = new Map();
+  recs.forEach(r => {
+    for (const col of equipColumns) {
+      const qty = toInt((r._raw||{})[col]);
+      if (qty > 0 && r.tipo === "Montagem") {
+        const key = `${col}`;
+        if (!byEquipKey.has(key)) byEquipKey.set(key, { montagens: [], manut: [], equip: col });
+        byEquipKey.get(key).montagens.push(r.data);
+      }
+      if (qty > 0 && r.tipo === "Manutenção") {
+        const key = `${col}`;
+        if (!byEquipKey.has(key)) byEquipKey.set(key, { montagens: [], manut: [], equip: col });
+        byEquipKey.get(key).manut.push(r.data);
+      }
+    }
+  });
+  
+  // Analisar cada equipamento
+  for (const [key, data] of byEquipKey.entries()) {
+    data.montagens.sort();
+    data.manut.sort();
+    
+    if (data.montagens.length === 0 || data.manut.length === 0) continue;
+    
+    let j = 0;
+    for (const montDate of data.montagens) {
+      while (j < data.manut.length && data.manut[j] < montDate) j++;
+      if (j >= data.manut.length) break;
+      const delta = daysBetween(montDate, data.manut[j]);
+      if (delta !== null && delta >= 0 && delta <= win) {
+        flagged.push({
+          equip: data.equip,
+          montagem: montDate,
+          manutencao: data.manut[j],
+          delta
+        });
+      }
+    }
+  }
+  
+  flagged.sort((a,b) => a.delta - b.delta);
+  
+  // Top equipamentos problemáticos (com mais manutenções)
+  const equipManutMap = new Map();
+  recs.filter(r => r.tipo === "Manutenção").forEach(r => {
+    for (const col of equipColumns) {
+      const qty = toInt((r._raw||{})[col]);
+      if (qty > 0) {
+        equipManutMap.set(col, (equipManutMap.get(col) || 0) + qty);
+      }
+    }
+  });
+  const topEquipProblematicos = topN(equipManutMap, 5);
+  
+  // Top motivos
+  const motivoMap = new Map();
+  recs.forEach(r => {
+    const motivo = r.motivo || "(sem motivo)";
+    motivoMap.set(motivo, (motivoMap.get(motivo) || 0) + 1);
+  });
+  const topMotivos = topN(motivoMap, 5);
+  
+  // Percentuais para insights
+  const pctManut = total > 0 ? ((manutencao / total) * 100).toFixed(1) : 0;
+  const pctMont = total > 0 ? ((montagem / total) * 100).toFixed(1) : 0;
+  const pctReinc = reincidencia.base > 0 ? ((reincidencia.reinc / reincidencia.base) * 100).toFixed(1) : 0;
+  
+  // Agrupar por mês para análise de tendência
+  const byMonth = new Map();
+  recs.forEach(r => {
+    const month = r.month;
+    if (month) {
+      if (!byMonth.has(month)) byMonth.set(month, { total: 0, manut: 0, mont: 0 });
+      const data = byMonth.get(month);
+      data.total++;
+      if (r.tipo === "Manutenção") data.manut++;
+      if (r.tipo === "Montagem") data.mont++;
+    }
+  });
+  
+  const mesesOrdenados = Array.from(byMonth.keys()).sort();
+  let tendencia = "Estável";
+  let variacao = 0;
+  
+  if (mesesOrdenados.length >= 2) {
+    const primeiro = mesesOrdenados[0];
+    const ultimo = mesesOrdenados[mesesOrdenados.length - 1];
+    const totalPrimeiro = byMonth.get(primeiro).total;
+    const totalUltimo = byMonth.get(ultimo).total;
+    variacao = totalUltimo - totalPrimeiro;
+    
+    if (variacao > 5) tendencia = "Crescimento";
+    else if (variacao > 2) tendencia = "Leve crescimento";
+    else if (variacao < -5) tendencia = "Queda";
+    else if (variacao < -2) tendencia = "Leve queda";
+  }
+  
+  // Determinar tipo predominante
+  const tipoPredominante = distribTipo.sort((a,b) => b.count - a.count)[0]?.tipo || "Nenhum";
+  
+  // Montar HTML
+  container.innerHTML = `
+    <div class="space-y-4">
+      <!-- Resumo geral -->
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-2">
+        <div class="bg-blue-50 p-2 rounded-xl text-center">
+          <div class="text-xs text-blue-800">Total</div>
+          <div class="text-xl font-bold text-blue-900">${total}</div>
+        </div>
+        <div class="bg-green-50 p-2 rounded-xl text-center">
+          <div class="text-xs text-green-800">Montagem</div>
+          <div class="text-xl font-bold text-green-900">${montagem} (${pctMont}%)</div>
+        </div>
+        <div class="bg-red-50 p-2 rounded-xl text-center">
+          <div class="text-xs text-red-800">Manutenção</div>
+          <div class="text-xl font-bold text-red-900">${manutencao} (${pctManut}%)</div>
+        </div>
+        <div class="bg-purple-50 p-2 rounded-xl text-center">
+          <div class="text-xs text-purple-800">Acréscimos</div>
+          <div class="text-xl font-bold text-purple-900">${acrescimos}</div>
+        </div>
+      </div>
+      
+      <!-- Cards de insight -->
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <div class="analysis-card p-3 rounded-xl">
+          <div class="flex items-center gap-2 mb-2">
+            <svg class="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+            </svg>
+            <span class="font-semibold text-sm">Análise de Tendência</span>
+          </div>
+          <div class="flex justify-between items-center">
+            <div>
+              <div class="text-xs text-gray-600">${mesesOrdenados.length} mês(es) analisado(s)</div>
+              <div class="text-lg font-bold ${variacao > 0 ? 'trend-up' : variacao < 0 ? 'trend-down' : ''}">
+                ${variacao > 0 ? '↑' : variacao < 0 ? '↓' : '→'} ${tendencia}
+              </div>
+            </div>
+            <div class="text-right">
+              <div class="text-xs text-gray-600">Variação</div>
+              <div class="font-mono ${variacao > 0 ? 'text-green-600' : variacao < 0 ? 'text-red-600' : ''}">
+                ${variacao > 0 ? '+' : ''}${variacao}
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <div class="analysis-card p-3 rounded-xl">
+          <div class="flex items-center gap-2 mb-2">
+            <svg class="w-4 h-4 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+            </svg>
+            <span class="font-semibold text-sm">Reincidência</span>
+          </div>
+          <div class="flex justify-between items-center">
+            <div>
+              <div class="text-xs text-gray-600">Taxa de reincidência</div>
+              <div class="text-lg font-bold ${pctReinc > 30 ? 'text-red-600' : pctReinc > 15 ? 'text-yellow-600' : 'text-green-600'}">
+                ${pctReinc}%
+              </div>
+            </div>
+            <div class="text-right">
+              <div class="text-xs text-gray-600">Casos</div>
+              <div class="font-mono">${reincidencia.reinc} / ${reincidencia.base}</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Distribuição por tipo (barras de progresso) -->
+      <div class="bg-white p-3 rounded-xl border shadowSoft">
+        <div class="text-sm font-semibold mb-2">Distribuição por tipo de serviço</div>
+        ${distribTipo.map(d => {
+          const pct = ((d.count / total) * 100).toFixed(1);
+          return `
+            <div class="mb-2">
+              <div class="flex justify-between text-xs mb-1">
+                <span>${d.tipo}</span>
+                <span class="font-mono">${d.count} (${pct}%)</span>
+              </div>
+              <div class="progress-bar">
+                <div class="progress-fill" style="width: ${pct}%; background-color: ${d.cor};"></div>
+              </div>
+            </div>
+          `;
+        }).join('')}
+      </div>
+      
+      <!-- Alertas de manutenção pós-montagem -->
+      ${flagged.length > 0 ? `
+        <div class="${flagged.length > 3 ? 'bg-red-50 border-l-4 border-red-500' : 'bg-yellow-50 border-l-4 border-yellow-500'} p-3 rounded-xl">
+          <div class="flex items-center gap-2 mb-2">
+            <svg class="w-4 h-4 ${flagged.length > 3 ? 'text-red-600' : 'text-yellow-600'}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+            </svg>
+            <span class="font-semibold text-sm">Alertas de Manutenção Pós-Montagem</span>
+            <span class="insight-badge ${flagged.length > 3 ? 'insight-critical' : 'insight-warning'} ml-auto">
+              ${flagged.length} caso(s)
+            </span>
+          </div>
+          <div class="text-xs mb-2">
+            Manutenções ocorridas até ${win} dias após montagem
+          </div>
+          <div class="max-h-40 overflow-y-auto">
+            ${flagged.slice(0, 5).map(f => `
+              <div class="flex justify-between text-xs py-1 border-b border-gray-100 last:border-0">
+                <span class="font-mono">${f.equip}</span>
+                <span>${f.montagem} → ${f.manutencao}</span>
+                <span class="font-bold ${f.delta <= 3 ? 'text-red-600' : 'text-orange-600'}">${f.delta} dias</span>
+              </div>
+            `).join('')}
+            ${flagged.length > 5 ? `<div class="text-xs text-gray-500 mt-1">... e mais ${flagged.length - 5} caso(s)</div>` : ''}
+          </div>
+        </div>
+      ` : ''}
+      
+      <!-- Top equipamentos problemáticos -->
+      ${topEquipProblematicos.length > 0 ? `
+        <div class="bg-white p-3 rounded-xl border shadowSoft">
+          <div class="text-sm font-semibold mb-2">Equipamentos com mais manutenções</div>
+          <div class="grid grid-cols-2 gap-2">
+            ${topEquipProblematicos.map(([equip, qty]) => {
+              const pctDoTotal = manutencao > 0 ? ((qty / manutencao) * 100).toFixed(1) : 0;
+              return `
+                <div class="flex justify-between items-center p-2 bg-gray-50 rounded-lg">
+                  <span class="text-xs truncate" title="${escapeHtml(equip)}">${escapeHtml(equip)}</span>
+                  <span class="font-mono font-bold text-sm">${qty} <span class="text-xs text-gray-500">(${pctDoTotal}%)</span></span>
+                </div>
+              `;
+            }).join('')}
+          </div>
+        </div>
+      ` : ''}
+      
+      <!-- Resumo executivo -->
+      <div class="bg-blue-50 p-3 rounded-xl">
+        <div class="text-xs font-semibold mb-1">📊 Resumo executivo - ${escapeHtml(clienteNome)}</div>
+        <ul class="text-xs space-y-1 list-disc pl-4">
+          <li>Tipo predominante: <b>${tipoPredominante}</b></li>
+          <li>${montagem} montagem(s) e ${manutencao} manutenção(ões) (${pctManut}% de chamados são manutenção)</li>
+          ${flagged.length > 0 ? `<li class="text-red-600">⚠️ ${flagged.length} caso(s) de manutenção em até ${win} dias após montagem</li>` : ''}
+          ${reincidencia.pct > 30 ? `<li class="text-red-600">⚠️ Alta taxa de reincidência: ${reincidencia.pct}%</li>` : ''}
+          ${topEquipProblematicos.length > 0 ? `<li>Equipamento mais problemático: <b>${escapeHtml(topEquipProblematicos[0][0])}</b> (${topEquipProblematicos[0][1]} manutenções)</li>` : ''}
+          <li>Tendência: <b>${tendencia}</b> (${variacao > 0 ? '+' : ''}${variacao} chamados no período)</li>
+        </ul>
+      </div>
+    </div>
+  `;
+}
+
 function openDrill(kind, label){
   drillModal.classList.remove("hidden");
   drillModal.classList.add("flex");
 
   let recs;
   if (kind==="tecnico") recs = filtered.filter(r=>(r.tecnico||"(vazio)")===label);
-  else recs = filtered.filter(r=>(r.cliente||"(vazio)")===label);
+  else recs = filtered.filter(r=> {
+    if (concatClientes && concatClientes.checked) {
+      return getEffectiveClient(r.cliente) === label;
+    } else {
+      return (r.cliente||"(vazio)") === label;
+    }
+  });
 
   const acresc = recs.reduce((a,r)=>a+(r.acrescimo||0),0);
   const equipS = sumEquip(recs);
@@ -2863,6 +3377,7 @@ function openDrill(kind, label){
 
   dTitle.textContent = `Drill-down: ${kind.toUpperCase()} • ${label}`;
   dSub.textContent = `${recs.length} registro(s) no recorte atual`;
+  dTimestamp.textContent = new Date().toLocaleString('pt-BR');
 
   const kpis = [];
   kpis.push(["Chamados", recs.length]);
@@ -2878,21 +3393,10 @@ function openDrill(kind, label){
     dKpis.appendChild(div);
   }
 
-  const byDay = groupCount(recs, r=>r.data || "(sem data)");
-  const entries = [...byDay.entries()].sort((a,b)=>String(a[0]).localeCompare(String(b[0])));
-  const labels = entries.map(([k])=>k);
-  const data   = entries.map(([,v])=>v);
-  dMeta.textContent = `${labels.length} dia(s)`;
+  // NOVA: Análise agregada do cliente
+  renderAggregatedAnalysis(recs, dAggregatedAnalysis, label);
 
-  destroyIfExists(dChart);
-  dChart = new Chart(el("dChart"), {
-    type:"line",
-    data:{ labels, datasets:[{ label:"Chamados", data, tension:0.25 }] },
-    options:{ responsive:true, plugins:{legend:{display:false}},
-      scales:{ x:{ticks:{maxRotation:0,autoSkip:true}}, y:{beginAtZero:true,ticks:{precision:0}} }
-    }
-  });
-
+  // Top clientes (unidades)
   const topClients = topN(groupCount(recs, r=>r.cliente||"(vazio)"), 8);
   const topReasons = topN(groupCount(recs, r=>r.motivo||"(vazio)"), 8);
 
@@ -2925,6 +3429,7 @@ function openDrill(kind, label){
     dTopEquip.appendChild(div);
   }
 }
+
 function closeDrill(){
   drillModal.classList.add("hidden");
   drillModal.classList.remove("flex");
@@ -3152,6 +3657,9 @@ btnExportJSON.addEventListener("click", exportJSON);
 [fBase, fCliente, fTecnico, fTipo, fEquip, fDe, fAte].forEach(x=>x.addEventListener("change", applyFilters));
 fSearch.addEventListener("input", debounce(applyFilters, 300));
 
+// Evento para concatenação de clientes
+concatClientes.addEventListener("change", applyFilters);
+
 // Eventos de alertas
 alertDias.addEventListener("change", renderAlerts);
 alertMinManut.addEventListener("change", renderAlerts);
@@ -3202,6 +3710,445 @@ document.addEventListener("keydown", (e)=>{
 function debounce(fn, ms){
   let t; return (...args)=>{ clearTimeout(t); t=setTimeout(()=>fn(...args), ms); };
 }
+
+/* =========================
+   FUNÇÃO PDF - CORRIGIDA PARA GERAR RELATÓRIO COMO NO EXEMPLO
+========================= */
+
+async function generateClientPDF() {
+  // Verificar se há cliente selecionado
+  const clienteSelecionado = fCliente.value.trim();
+  if (!clienteSelecionado) {
+    alert('Selecione um cliente para gerar o relatório PDF.');
+    return;
+  }
+
+  // Mostrar loading
+  pdfLoadingOverlay.style.display = 'flex';
+  pdfLoadingMessage.textContent = 'Gerando relatório...';
+
+  try {
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({
+      orientation: 'portrait',
+      unit: 'mm',
+      format: 'a4'
+    });
+
+    // Cores
+    const azulEscuro = [15, 23, 42];     // #0f172a
+    const cinzaTexto = [51, 51, 51];      // Texto principal
+    const cinzaLabel = [102, 102, 102];   // Labels
+    const cinzaBorda = [220, 220, 220];   // Bordas
+    const cinzaFundo = [248, 248, 248];   // Fundo sutil
+
+    // Dados do cliente
+    const clienteRecords = filtered.filter(r => 
+      concatClientes && concatClientes.checked 
+        ? getEffectiveClient(r.cliente) === clienteSelecionado
+        : r.cliente === clienteSelecionado
+    );
+
+    // Ordenar por data (mais recente primeiro para registros)
+    clienteRecords.sort((a, b) => (b.data || '').localeCompare(a.data || ''));
+
+    // ========== ESTATÍSTICAS ==========
+    const total = clienteRecords.length;
+    const montagem = clienteRecords.filter(r => r.tipo === "Montagem").length;
+    const manutencao = clienteRecords.filter(r => r.tipo === "Manutenção").length;
+    const retirada = clienteRecords.filter(r => r.tipo === "Retirada").length;
+    const troca = clienteRecords.filter(r => r.tipo === "Troca").length;
+    const revisao = clienteRecords.filter(r => r.tipo === "Revisão").length;
+    
+    // Percentuais
+    const pctMont = total > 0 ? ((montagem / total) * 100).toFixed(1) : 0;
+    const pctManut = total > 0 ? ((manutencao / total) * 100).toFixed(1) : 0;
+    const pctRet = total > 0 ? ((retirada / total) * 100).toFixed(1) : 0;
+    const pctTroca = total > 0 ? ((troca / total) * 100).toFixed(1) : 0;
+    const pctRev = total > 0 ? ((revisao / total) * 100).toFixed(1) : 0;
+
+    // Acréscimos (apenas número)
+    const acrescimos = clienteRecords.reduce((sum, r) => sum + (r.acrescimo || 0), 0);
+
+    // Período
+    const datas = clienteRecords.map(r => r.data).filter(Boolean).sort();
+    const periodoInicio = datas.length ? formatDateBR(datas[0]) : 'N/A';
+    const periodoFim = datas.length ? formatDateBR(datas[datas.length-1]) : 'N/A';
+
+    // Equipamentos com mais manutenções
+    const equipManutMap = new Map();
+    clienteRecords.filter(r => r.tipo === "Manutenção").forEach(r => {
+      for (const col of equipColumns) {
+        const qty = toInt((r._raw||{})[col]);
+        if (qty > 0) {
+          equipManutMap.set(col, (equipManutMap.get(col) || 0) + qty);
+        }
+      }
+    });
+    
+    const topEquip = Array.from(equipManutMap.entries())
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 3);
+
+    // Tipo predominante
+    const tipos = [
+      { nome: 'Montagem', valor: montagem },
+      { nome: 'Manutenção', valor: manutencao },
+      { nome: 'Retirada', valor: retirada },
+      { nome: 'Troca', valor: troca },
+      { nome: 'Revisão', valor: revisao }
+    ];
+    const tipoPredominante = tipos.reduce((max, t) => t.valor > max.valor ? t : max, { valor: 0, nome: 'Nenhum' });
+
+    // Tendência (comparar primeiro e último mês)
+    const meses = [...new Set(clienteRecords.map(r => r.month).filter(Boolean))].sort();
+    let tendencia = 'Estável';
+    let variacao = 0;
+    if (meses.length >= 2) {
+      const primeiroMes = clienteRecords.filter(r => r.month === meses[0]).length;
+      const ultimoMes = clienteRecords.filter(r => r.month === meses[meses.length-1]).length;
+      variacao = ultimoMes - primeiroMes;
+      if (variacao > 2) tendencia = 'Crescimento';
+      else if (variacao < -2) tendencia = 'Queda';
+    }
+
+    // ========== PÁGINA 1 ==========
+    
+    // --- CABEÇALHO AZUL ESCURO ---
+    doc.setFillColor(azulEscuro[0], azulEscuro[1], azulEscuro[2]);
+    doc.rect(0, 0, 210, 35, 'F');
+    
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(22);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Smart Conecta', 20, 20);
+    
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+    doc.text('Relatório Analítico do Cliente', 20, 30);
+
+    // --- NOME DO CLIENTE ---
+    doc.setTextColor(azulEscuro[0], azulEscuro[1], azulEscuro[2]);
+    doc.setFontSize(18);
+    doc.setFont('helvetica', 'bold');
+    doc.text(clienteSelecionado, 20, 52);
+
+    // --- METADADOS (linha sutil) ---
+    doc.setFontSize(9);
+    doc.setTextColor(cinzaLabel[0], cinzaLabel[1], cinzaLabel[2]);
+    doc.text(`Gerado em: ${new Date().toLocaleString('pt-BR')}`, 20, 62);
+    doc.text(`Período: ${periodoInicio} a ${periodoFim}`, 20, 68);
+
+    // --- RESUMO EXECUTIVO (exatamente como no anexo) ---
+    const resumoY = 85;
+    
+    doc.setFontSize(14);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(azulEscuro[0], azulEscuro[1], azulEscuro[2]);
+    doc.text('Análise Agregada do Cliente', 20, resumoY);
+    
+    // Linha divisória
+    doc.setDrawColor(cinzaBorda[0], cinzaBorda[1], cinzaBorda[2]);
+    doc.line(20, resumoY + 5, 190, resumoY + 5);
+
+    // 1. Distribuição por tipo de serviço
+    doc.setFontSize(11);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(cinzaTexto[0], cinzaTexto[1], cinzaTexto[2]);
+    doc.text('Distribuição por tipo de serviço', 20, resumoY + 18);
+
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(cinzaTexto[0], cinzaTexto[1], cinzaTexto[2]);
+    
+    let y = resumoY + 28;
+    const tiposLista = [
+      { nome: 'Retirada', valor: retirada, pct: pctRet },
+      { nome: 'Montagem', valor: montagem, pct: pctMont },
+      { nome: 'Manutenção', valor: manutencao, pct: pctManut },
+      { nome: 'Troca', valor: troca, pct: pctTroca },
+      { nome: 'Revisão', valor: revisao, pct: pctRev }
+    ].filter(t => t.valor > 0).sort((a, b) => b.valor - a.valor);
+    
+    tiposLista.forEach(tipo => {
+      doc.text(`• ${tipo.nome}: ${tipo.valor} (${tipo.pct}%)`, 25, y);
+      y += 7;
+    });
+
+    // Linha divisória
+    y += 5;
+    doc.setDrawColor(cinzaBorda[0], cinzaBorda[1], cinzaBorda[2]);
+    doc.line(20, y, 190, y);
+    y += 10;
+
+    // 2. Equipamentos com mais manutenções
+    doc.setFontSize(11);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(cinzaTexto[0], cinzaTexto[1], cinzaTexto[2]);
+    doc.text('Equipamentos com mais manutenções', 20, y);
+
+    y += 8;
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+    
+    if (topEquip.length > 0) {
+      topEquip.forEach(([equip, qtd]) => {
+        const pct = manutencao > 0 ? ((qtd / manutencao) * 100).toFixed(1) : 0;
+        doc.text(`• ${equip}: ${qtd} (${pct}%)`, 25, y);
+        y += 7;
+      });
+    } else {
+      doc.text('• Nenhum equipamento com manutenção', 25, y);
+      y += 7;
+    }
+
+    // Linha divisória
+    y += 5;
+    doc.setDrawColor(cinzaBorda[0], cinzaBorda[1], cinzaBorda[2]);
+    doc.line(20, y, 190, y);
+    y += 10;
+
+    // 3. Resumo executivo (exatamente como no anexo)
+    doc.setFontSize(11);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(cinzaTexto[0], cinzaTexto[1], cinzaTexto[2]);
+    doc.text(`Resumo executivo - ${clienteSelecionado}`, 20, y);
+
+    y += 8;
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+    
+    const linhasResumo = [
+      `• Tipo predominante: ${tipoPredominante.nome}`,
+      `• ${montagem} montagem(s) e ${manutencao} manutenção(ões) (${pctManut}% de chamados são manutenção)`,
+      topEquip.length > 0 ? `• Equipamento mais problemático: ${topEquip[0][0]} (${topEquip[0][1]} manutenções)` : null,
+      `• Tendência: ${tendencia} (${variacao > 0 ? '+' : ''}${variacao} chamados no período)`
+    ].filter(l => l !== null);
+    
+    linhasResumo.forEach(linha => {
+      doc.text(linha, 25, y);
+      y += 7;
+    });
+
+    // ========== PÁGINA 2 ==========
+    doc.addPage();
+
+    // --- CABEÇALHO DA PÁGINA 2 ---
+    doc.setFillColor(azulEscuro[0], azulEscuro[1], azulEscuro[2]);
+    doc.rect(0, 0, 210, 15, 'F');
+    
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(8);
+    doc.setFont('helvetica', 'normal');
+    doc.text(`Registros - ${clienteSelecionado}`, 20, 10);
+
+    // --- TÍTULO ---
+    doc.setTextColor(azulEscuro[0], azulEscuro[1], azulEscuro[2]);
+    doc.setFontSize(14);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Registros Detalhados', 20, 30);
+
+    // --- TABELA DE REGISTROS (SIMPLES E LIMPA) ---
+    const registrosParaMostrar = clienteRecords.slice(0, 25); // 25 registros
+    
+    const registrosTable = registrosParaMostrar.map(r => [
+      formatDateBR(r.data),
+      r.chamado || '',
+      r.tecnico || '',
+      r.tipo || '',
+      r.acrescimo ? r.acrescimo.toString() : '0',
+      (r.motivo || '').substring(0, 25)
+    ]);
+
+    doc.autoTable({
+      startY: 35,
+      head: [['Data', 'Chamado', 'Técnico', 'Tipo', 'Acr.', 'Motivo']],
+      body: registrosTable,
+      theme: 'plain',
+      headStyles: { 
+        fillColor: cinzaFundo,
+        textColor: azulEscuro,
+        fontStyle: 'bold',
+        fontSize: 9,
+        cellPadding: 5,
+        halign: 'left',
+        lineColor: cinzaBorda,
+        lineWidth: 0.5
+      },
+      styles: { 
+        fontSize: 8,
+        cellPadding: 4,
+        textColor: cinzaTexto,
+        lineColor: cinzaBorda,
+        lineWidth: 0.3
+      },
+      columnStyles: { 
+        0: { cellWidth: 22 },   // Data
+        1: { cellWidth: 25 },   // Chamado
+        2: { cellWidth: 25 },   // Técnico
+        3: { cellWidth: 20 },   // Tipo
+        4: { cellWidth: 12, halign: 'right' },  // Acr.
+        5: { cellWidth: 60 }    // Motivo
+      },
+      margin: { left: 15, right: 15 }
+    });
+
+    // Total de registros
+    if (clienteRecords.length > 25) {
+      doc.setFontSize(8);
+      doc.setTextColor(cinzaLabel[0], cinzaLabel[1], cinzaLabel[2]);
+      doc.text(`Total: ${clienteRecords.length} registros (exibindo os 25 mais recentes)`, 20, doc.lastAutoTable.finalY + 8);
+    } else {
+      doc.setFontSize(8);
+      doc.setTextColor(cinzaLabel[0], cinzaLabel[1], cinzaLabel[2]);
+      doc.text(`Total: ${clienteRecords.length} registros`, 20, doc.lastAutoTable.finalY + 8);
+    }
+
+    // --- TÉCNICOS ENVOLVIDOS (card simples) ---
+    const tecnicosMap = new Map();
+    clienteRecords.forEach(r => {
+      if (r.tecnico) {
+        tecnicosMap.set(r.tecnico, (tecnicosMap.get(r.tecnico) || 0) + 1);
+      }
+    });
+    
+    const tecnicosOrdenados = Array.from(tecnicosMap.entries())
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 8);
+
+    const tecnicosY = doc.lastAutoTable.finalY + 18;
+    
+    doc.setFontSize(11);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(azulEscuro[0], azulEscuro[1], azulEscuro[2]);
+    doc.text('Técnicos Envolvidos', 20, tecnicosY);
+
+    // Cards simples para técnicos
+    let cardX = 20;
+    let cardY = tecnicosY + 8;
+    let cardCount = 0;
+    
+    tecnicosOrdenados.forEach(([tecnico, qtd]) => {
+      // Card
+      doc.setFillColor(cinzaFundo[0], cinzaFundo[1], cinzaFundo[2]);
+      doc.setDrawColor(cinzaBorda[0], cinzaBorda[1], cinzaBorda[2]);
+      doc.roundedRect(cardX, cardY, 50, 15, 2, 2, 'FD');
+      
+      doc.setFontSize(8);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(cinzaLabel[0], cinzaLabel[1], cinzaLabel[2]);
+      doc.text(tecnico.substring(0, 10), cardX + 3, cardY + 5);
+      
+      doc.setFontSize(9);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(azulEscuro[0], azulEscuro[1], azulEscuro[2]);
+      doc.text(qtd.toString(), cardX + 3, cardY + 12);
+      
+      cardX += 55;
+      cardCount++;
+      
+      if (cardCount === 3) {
+        cardX = 20;
+        cardY += 20;
+        cardCount = 0;
+      }
+    });
+
+    // --- RODAPÉ ---
+    const rodapeY = cardY + 30;
+    doc.setDrawColor(cinzaBorda[0], cinzaBorda[1], cinzaBorda[2]);
+    doc.line(20, rodapeY, 190, rodapeY);
+    
+    doc.setFontSize(7);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(cinzaLabel[0], cinzaLabel[1], cinzaLabel[2]);
+    doc.text('Smart Conecta • Relatório Analítico', 20, rodapeY + 5);
+    doc.text(new Date().toLocaleString('pt-BR'), 20, rodapeY + 10);
+
+    // Salvar PDF
+    const nomeArquivo = `Relatorio_${clienteSelecionado.replace(/\s+/g, '_')}_${new Date().toISOString().slice(0,10)}.pdf`;
+    doc.save(nomeArquivo);
+    
+    pdfLoadingOverlay.style.display = 'none';
+    
+  } catch (error) {
+    console.error('Erro ao gerar PDF:', error);
+    pdfLoadingOverlay.style.display = 'none';
+    alert('Erro ao gerar PDF: ' + error.message);
+  }
+}
+
+// Adicionar evento ao botão de PDF
+document.addEventListener('DOMContentLoaded', function() {
+  // Controle do botão PDF
+  const pdfButtonContainer = document.getElementById('pdfReportButtonContainer');
+  const fCliente = document.getElementById('fCliente');
+  const btnGeneratePDF = document.getElementById('btnGeneratePDF');
+  
+  // Função para mostrar/esconder botão
+  function togglePDFButton() {
+    if (!pdfButtonContainer || !fCliente) return;
+    
+    if (fCliente.value && fCliente.value.trim() !== '') {
+      pdfButtonContainer.classList.remove('hidden');
+      console.log('Botão PDF mostrado para cliente:', fCliente.value);
+    } else {
+      pdfButtonContainer.classList.add('hidden');
+      console.log('Botão PDF escondido');
+    }
+  }
+  
+  // Eventos que podem mudar o cliente selecionado
+  if (fCliente) {
+    // Change no select
+    fCliente.addEventListener('change', togglePDFButton);
+    
+    // Também monitorar o campo de busca (autocomplete)
+    const clientSearch = document.getElementById('clientSearch');
+    if (clientSearch) {
+      clientSearch.addEventListener('blur', function() {
+        // Pequeno delay para garantir que o select foi atualizado
+        setTimeout(togglePDFButton, 150);
+      });
+      
+      clientSearch.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') {
+          setTimeout(togglePDFButton, 150);
+        }
+      });
+    }
+  }
+  
+  // Botão de gerar PDF
+  if (btnGeneratePDF) {
+    btnGeneratePDF.addEventListener('click', generateClientPDF);
+  }
+  
+  // Verificar estado inicial
+  togglePDFButton();
+  
+  // Observar mudanças no select via MutationObserver (caso alguém mude programaticamente)
+  if (fCliente) {
+    const observer = new MutationObserver(function(mutations) {
+      mutations.forEach(function(mutation) {
+        if (mutation.type === 'attributes' && mutation.attributeName === 'value') {
+          togglePDFButton();
+        }
+      });
+    });
+    
+    observer.observe(fCliente, { attributes: true });
+  }
+  
+  // Também verificar quando aplicar filtros
+  const applyFiltersOriginal = window.applyFilters;
+  if (applyFiltersOriginal) {
+    window.applyFilters = function() {
+      applyFiltersOriginal();
+      setTimeout(togglePDFButton, 100);
+    };
+  }
+});
 
 /* =========================
    INIT charts vazios
