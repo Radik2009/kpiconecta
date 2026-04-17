@@ -2255,18 +2255,55 @@ function renderSingleMonthDetailedAnalysis(month) {
   `;
 }
 
+// ==================== FUNÇÃO PARA AGRUPAR TIPOS NA COMPARAÇÃO ====================
+
+function agruparTipoParaComparacao(tipo) {
+  if (!tipo) return "(vazio)";
+  
+  const tipoLower = tipo.toLowerCase();
+  
+  // Agrupar Montagem (inclui Montagem Nova, Montagem +, Montagem E)
+  if (tipoLower.includes('montagem')) {
+    return 'Montagem';
+  }
+  
+  // Agrupar Manutenção (inclui Manutenção I, Manutenção C)
+  if (tipoLower.includes('manutenção') || tipoLower.includes('manutencao')) {
+    return 'Manutenção';
+  }
+  
+  // Agrupar Retirada (inclui Retirada E)
+  if (tipoLower.includes('retirada')) {
+    return 'Retirada';
+  }
+  
+  // Agrupar Troca
+  if (tipoLower.includes('troca')) {
+    return 'Troca';
+  }
+  
+  // Agrupar Revisão
+  if (tipoLower.includes('revisão') || tipoLower.includes('revisao')) {
+    return 'Revisão';
+  }
+  
+  // Para outros tipos, mantém o original (ex: REPOSIÇÃO, CONTADOR, etc.)
+  return tipo;
+}
+
 function renderMultipleMonthsComparison(months) {
   // Dados por mês
   const monthlyData = months.map(month => {
     const monthRecords = filtered.filter(r => r.month === month && r.tipo && r.tipo !== "");
-
-    // Contagem por tipo
+    
+    // Contagem por tipo AGRUPADO
     const counts = {};
-    VALID_TIPOS.forEach(tipo => {
-      counts[tipo] = monthRecords.filter(r => r.tipo === tipo).length;
+    monthRecords.forEach(r => {
+      const tipoAgrupado = agruparTipoParaComparacao(r.tipo);
+      counts[tipoAgrupado] = (counts[tipoAgrupado] || 0) + 1;
     });
     
-    // Total válido (apenas tipos válidos)
+    // Total de registros
     const totalValid = monthRecords.length;
     
     // Acréscimos
@@ -2296,9 +2333,38 @@ function renderMonthlyKPIs(monthlyData) {
   const container = document.createElement('div');
   container.className = 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3';
   
+  // Definir a ordem fixa dos tipos para exibição
+  const ordemTipos = ['Montagem', 'Manutenção', 'Troca', 'Revisão', 'Retirada'];
+  
   monthlyData.forEach(data => {
     const div = document.createElement('div');
     div.className = 'card rounded-2xl p-4 bg-white shadowMedium';
+    
+    // Construir o HTML interno com os tipos na ordem correta
+    let tiposHTML = '';
+    ordemTipos.forEach(tipo => {
+      const valor = data.counts[tipo] || 0;
+      if (valor > 0 || true) { // mostra mesmo se for zero para manter consistência
+        tiposHTML += `
+          <div class="flex justify-between">
+            <span class="muted">${tipo}:</span>
+            <span class="mono">${valor}</span>
+          </div>
+        `;
+      }
+    });
+    
+    // Adicionar também outros tipos que não estão na lista principal (se houver)
+    const outrosTipos = Object.keys(data.counts).filter(t => !ordemTipos.includes(t));
+    outrosTipos.forEach(tipo => {
+      tiposHTML += `
+        <div class="flex justify-between">
+          <span class="muted">${escapeHtml(tipo)}:</span>
+          <span class="mono">${data.counts[tipo]}</span>
+        </div>
+      `;
+    });
+    
     div.innerHTML = `
       <div class="text-sm font-semibold">${data.month}</div>
       <div class="mt-2 space-y-1 text-sm">
@@ -2310,12 +2376,7 @@ function renderMonthlyKPIs(monthlyData) {
           <span class="muted">Acréscimos:</span>
           <span class="mono font-semibold">${data.acrescimos}</span>
         </div>
-        ${Object.entries(data.counts).map(([tipo, valor]) => `
-          <div class="flex justify-between">
-            <span class="muted">${escapeHtml(tipo)}:</span>
-            <span class="mono">${valor}</span>
-          </div>
-        `).join('')}
+        ${tiposHTML}
       </div>
     `;
     container.appendChild(div);
@@ -2327,14 +2388,31 @@ function renderMonthlyKPIs(monthlyData) {
 function renderComparisonCharts(monthlyData) {
   const months = monthlyData.map(d => d.month);
   
+  // Definir a ordem fixa dos tipos para o gráfico
+  const ordemTiposGrafico = ['Montagem', 'Manutenção', 'Troca', 'Revisão', 'Retirada'];
+  
+  // Pegar todos os tipos agrupados que existem nos dados
+  const tiposExistentes = new Set(monthlyData.flatMap(d => Object.keys(d.counts)));
+  
+  // Filtrar a ordem fixa apenas pelos tipos que realmente existem
+  const allGroupedTypes = ordemTiposGrafico.filter(tipo => tiposExistentes.has(tipo));
+  
+  // Cores para cada tipo (na ordem definida)
+  const coresPorTipo = {
+    'Montagem': '#10b981',    // verde
+    'Manutenção': '#ef4444',  // vermelho
+    'Troca': '#f59e0b',       // laranja
+    'Revisão': '#8b5cf6',     // roxo
+    'Retirada': '#3b82f6'     // azul
+  };
+  
   // Gráfico 1: Comparação por tipo (agrupado)
-  const datasets1 = VALID_TIPOS.map((tipo, idx) => {
-    const colors = ['#4f46e5', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'];
+  const datasets1 = allGroupedTypes.map((tipo) => {
     return {
       label: tipo,
-      data: monthlyData.map(d => d.counts[tipo]),
-      backgroundColor: colors[idx % colors.length],
-      borderColor: colors[idx % colors.length],
+      data: monthlyData.map(d => d.counts[tipo] || 0),
+      backgroundColor: coresPorTipo[tipo] || '#6b7280',
+      borderColor: coresPorTipo[tipo] || '#6b7280',
       borderWidth: 1
     };
   });
@@ -2404,16 +2482,16 @@ function renderComparisonCharts(monthlyData) {
 function renderComparisonTableWithTrend(monthlyData) {
   const months = monthlyData.map(d => d.month);
   
-  // Cabeçalho
-  const thead = document.querySelector('#compareTableBody').closest('table').querySelector('thead tr');
-  thead.innerHTML = '<th class="p-2">Tipo</th>';
+  // Montar cabeçalho da tabela
+  let headerHTML = '<th class="p-2">Tipo</th>';
   months.forEach(month => {
-    thead.innerHTML += `<th class="p-2">${month}</th>`;
+    headerHTML += `<th class="p-2">${month}</th>`;
   });
-  thead.innerHTML += '<th class="p-2">Variação</th><th class="p-2">%</th>';
+  headerHTML += '<th class="p-2">Variação</th><th class="p-2">%</th>';
   
-  // Corpo da tabela
-  let tableHTML = '';
+  // Atualizar o cabeçalho da tabela
+  const theadRow = document.querySelector('#compareTableBody').closest('table').querySelector('thead tr');
+  theadRow.innerHTML = headerHTML;
   
   // Calcular totais por mês
   const totalsByMonth = months.map(month => {
@@ -2421,51 +2499,60 @@ function renderComparisonTableWithTrend(monthlyData) {
     return data ? data.totalValid : 0;
   });
   
-  // Linhas para cada tipo
-const allTypes = [...new Set(monthlyData.flatMap(d => Object.keys(d.counts)))];
-allTypes.forEach(tipo => {
-  const rowData = months.map(month => {
-    const data = monthlyData.find(d => d.month === month);
-    return data ? data.counts[tipo] || 0 : 0;
-  });
+  // Definir a ordem fixa dos tipos
+  const ordemTipos = ['Montagem', 'Manutenção', 'Troca', 'Revisão', 'Retirada'];
+  
+  // Pegar todos os tipos AGRUPADOS únicos que existem nos dados
+  const tiposExistentes = new Set(monthlyData.flatMap(d => Object.keys(d.counts)));
+  
+  // Filtrar a ordem fixa apenas pelos tipos que realmente existem nos dados
+  const allTypes = ordemTipos.filter(tipo => tiposExistentes.has(tipo));
+  
+  let tableHTML = '';
+  
+  // Criar uma linha para cada tipo agrupado (na ordem definida)
+  allTypes.forEach(tipo => {
+    const rowData = months.map(month => {
+      const data = monthlyData.find(d => d.month === month);
+      return data ? (data.counts[tipo] || 0) : 0;
+    });
     
     // Calcular variação
     const firstValue = rowData[0];
     const lastValue = rowData[rowData.length - 1];
     const variation = lastValue - firstValue;
-    const variationPct = firstValue > 0 ? ((variation / firstValue) * 100).toFixed(1) : 'N/A';
+    const variationPct = firstValue > 0 ? ((variation / firstValue) * 100).toFixed(1) : (variation !== 0 ? '∞' : '0%');
     
     tableHTML += `
       <tr class="border-t hover:bg-slate-50">
-        <td class="p-2 font-medium">${tipo}</td>
+        <td class="p-2 font-medium">${escapeHtml(tipo)}</td>
         ${rowData.map(val => `<td class="p-2 mono text-center">${val}</td>`).join('')}
         <td class="p-2 mono text-center ${variation > 0 ? 'trend-up' : variation < 0 ? 'trend-down' : ''}">
           ${variation > 0 ? '+' : ''}${variation}
         </td>
         <td class="p-2 mono text-center ${variation > 0 ? 'trend-up' : variation < 0 ? 'trend-down' : ''}">
-          ${variationPct !== 'N/A' ? `${variationPct}%` : 'N/A'}
+          ${variationPct !== '∞' ? `${variationPct}%` : variationPct}
         </td>
       </tr>
     `;
   });
   
-  // Linha de total com análise de tendência
+  // Linha de TOTAL
   const firstTotal = totalsByMonth[0];
   const lastTotal = totalsByMonth[totalsByMonth.length - 1];
   const totalVariation = lastTotal - firstTotal;
   const totalVariationPct = firstTotal > 0 ? ((totalVariation / firstTotal) * 100).toFixed(1) : 'N/A';
-  const totalRowData = totalsByMonth;
-  const grandTotal = totalRowData.reduce((sum, val) => sum + val, 0);
+  const grandTotal = totalsByMonth.reduce((sum, val) => sum + val, 0);
   const avgPerMonth = (grandTotal / months.length).toFixed(1);
   
   tableHTML += `
-    <tr class="border-t bg-slate-100">
-      <td class="p-2 font-semibold">TOTAL</td>
-      ${totalRowData.map(val => `<td class="p-2 mono font-semibold text-center">${val}</td>`).join('')}
-      <td class="p-2 mono font-semibold text-center ${totalVariation > 0 ? 'trend-up' : totalVariation < 0 ? 'trend-down' : ''}">
+    <tr class="border-t bg-slate-100 font-semibold">
+      <td class="p-2">TOTAL</td>
+      ${totalsByMonth.map(val => `<td class="p-2 mono text-center">${val}</td>`).join('')}
+      <td class="p-2 mono text-center ${totalVariation > 0 ? 'trend-up' : totalVariation < 0 ? 'trend-down' : ''}">
         ${totalVariation > 0 ? '+' : ''}${totalVariation}
       </td>
-      <td class="p-2 mono font-semibold text-center ${totalVariation > 0 ? 'trend-up' : totalVariation < 0 ? 'trend-down' : ''}">
+      <td class="p-2 mono text-center ${totalVariation > 0 ? 'trend-up' : totalVariation < 0 ? 'trend-down' : ''}">
         ${totalVariationPct !== 'N/A' ? `${totalVariationPct}%` : 'N/A'}
       </td>
     </tr>
@@ -2495,6 +2582,7 @@ allTypes.forEach(tipo => {
     </tr>
   `;
   
+  // Atualizar o corpo da tabela
   compareTableBody.innerHTML = tableHTML;
 }
 
