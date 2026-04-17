@@ -599,6 +599,11 @@
             <!-- Será preenchido dinamicamente -->
           </div>
 
+          <!-- Indicador do modo de alerta -->
+          <div id="alertModeIndicator" class="mb-3 text-xs p-2 rounded-lg bg-slate-100 text-slate-600">
+            <!-- Será preenchido dinamicamente -->
+          </div>
+
           <!-- Lista de alertas -->
           <div id="alertsContainer">
             <div class="text-sm muted text-center p-4" id="noAlertsMessage">
@@ -1091,8 +1096,28 @@ function detectAlerts() {
   
   alertPeriodLabel.textContent = `${daysWindow} dias`;
   
-  // Filtrar apenas manutenções
-  const manutencaoRecords = filtered.filter(r => r.tipo === "Manutenção");
+  // Verificar se estamos em modo moderno (Abril/2026 em diante)
+  const isModernMode = isModernModeActive();
+  
+  // Filtrar manutenções usando a lógica híbrida
+  const manutencaoRecords = filtered.filter(r => isManutencaoRecord(r, isModernMode));
+  
+  // Adicionar indicador visual do modo na interface
+  const modoTexto = isModernMode ? "🔵 Modo: Manutenção I + C (Abril/2026 em diante)" : "🟡 Modo: Legado (palavra 'manutenção' no motivo)";
+  const alertModeIndicator = document.getElementById("alertModeIndicator");
+  if (alertModeIndicator) {
+    alertModeIndicator.textContent = modoTexto;
+  } else {
+    // Criar o indicador se não existir
+    const summaryDiv = document.getElementById("alertSummary");
+    if (summaryDiv && !document.getElementById("alertModeIndicator")) {
+      const modeDiv = document.createElement("div");
+      modeDiv.id = "alertModeIndicator";
+      modeDiv.className = "text-xs mt-2 p-2 rounded-lg bg-slate-100";
+      modeDiv.textContent = modoTexto;
+      summaryDiv.parentNode.insertBefore(modeDiv, summaryDiv.nextSibling);
+    }
+  }
   
   if (manutencaoRecords.length === 0) {
     alertsData = [];
@@ -1203,7 +1228,60 @@ function detectAlerts() {
   
   alertsData = alerts;
 }
+// Função para verificar se o filtro está em modo moderno (Abril/2026 em diante)
+function isModernModeActive() {
+  // Verifica filtro de data de início
+  const dataInicio = document.getElementById("fDe").value;
+  if (dataInicio && dataInicio >= "2026-04-01") return true;
+  
+  // Verifica filtro de data de fim
+  const dataFim = document.getElementById("fAte").value;
+  if (dataFim && dataFim >= "2026-04-01") return true;
+  
+  // Verifica se há mês selecionado na página de comparação que seja Abril/2026+
+  if (typeof selectedMonths !== 'undefined' && selectedMonths) {
+    const monthsArray = Array.from(selectedMonths);
+    if (monthsArray.some(month => month >= "2026-04")) return true;
+  }
+  
+  return false;
+}
 
+// Função para verificar se um registro é considerado "Manutenção" (modo híbrido)
+function isManutencaoRecord(record, isModernMode) {
+  if (isModernMode) {
+    // Modo moderno (Abril/2026+): apenas tipos específicos
+    return record.tipo === "Manutenção I" || record.tipo === "Manutenção C";
+  } else {
+    // Modo legado (dados antigos): busca palavra "manutenção" no motivo ou tipo
+    const motivoLower = (record.motivo || "").toLowerCase();
+    const tipoLower = (record.tipo || "").toLowerCase();
+    return motivoLower.includes("manutenção") || tipoLower.includes("manutenção");
+  }
+}
+function getTipoBadgeClass(tipo) {
+  if (!tipo) return 'bg-gray-100 text-gray-600';
+  
+  const tipoLower = tipo.toLowerCase();
+  
+  if (tipoLower === 'manutenção i') {
+    return 'bg-yellow-100 text-yellow-800';
+  }
+  if (tipoLower === 'manutenção c') {
+    return 'bg-blue-100 text-blue-800';
+  }
+  if (tipoLower.includes('montagem')) {
+    return 'bg-green-100 text-green-800';
+  }
+  if (tipoLower.includes('retirada')) {
+    return 'bg-orange-100 text-orange-800';
+  }
+  if (tipoLower.includes('revisão')) {
+    return 'bg-purple-100 text-purple-800';
+  }
+  
+  return 'bg-gray-100 text-gray-600';
+}
 function renderAlerts() {
   detectAlerts();
   
@@ -1362,10 +1440,10 @@ function createAlertElement(alert, index) {
         <th class="p-2">Acrésc.</th>
         <th class="p-2">Motivo</th>
         <th class="p-2">Equipamentos</th>
+        <th class="p-2">Tipo</th>
       </tr>
     </thead>
     <tbody id="alert-table-${index}">
-      <!-- Linhas serão preenchidas abaixo -->
     </tbody>
   `;
   
@@ -1392,6 +1470,11 @@ function createAlertElement(alert, index) {
       <td class="p-2 mono">${record.acrescimo || 0}</td>
       <td class="p-2">${escapeHtml(record.motivo)}</td>
       <td class="p-2 text-xs">${recordEquip.length > 0 ? recordEquip.join(', ') : '—'}</td>
+      <td class="p-2">
+      <span class="px-2 py-0.5 rounded-full text-xs font-medium ${getTipoBadgeClass(record.tipo)}">
+        ${escapeHtml(record.tipo || '—')}
+      </span>
+      </td>
     `;
     
     tbody.appendChild(tr);
@@ -1998,6 +2081,11 @@ function monthsAvailableFromFiltered() {
 
 function renderMonthlyComparison() {
   const months = Array.from(selectedMonths).sort();
+  
+  // Atualizar alertas quando o mês selecionado mudar (para o modo híbrido funcionar)
+  if (typeof renderAlerts === 'function') {
+    renderAlerts();
+  }
   
   // Mostrar/ocultar seções baseado no número de meses selecionados
   if (months.length === 0) {
@@ -3685,7 +3773,13 @@ btnReset.addEventListener("click", ()=>resetFilters(true));
 btnExportCSV.addEventListener("click", exportCSV);
 btnExportJSON.addEventListener("click", exportJSON);
 
-[fBase, fCliente, fTecnico, fTipo, fEquip, fDe, fAte].forEach(x=>x.addEventListener("change", applyFilters));
+[fBase, fCliente, fTecnico, fTipo, fEquip, fDe, fAte].forEach(x=>x.addEventListener("change", () => {
+  applyFilters();
+  // Atualizar alertas também quando data mudar (para o modo híbrido)
+  if (typeof renderAlerts === 'function') {
+    setTimeout(renderAlerts, 100);
+  }
+}));
 fSearch.addEventListener("input", debounce(applyFilters, 300));
 
 // Evento para concatenação de clientes
