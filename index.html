@@ -974,15 +974,12 @@ function inferBase(obj, sheetName){
 }
 
 function normalizeTipo(rawTipo){
-  const t = safeStr(rawTipo).toLowerCase();
+  const t = safeStr(rawTipo);
   if (!t) return "";
-  if (t.includes("mont")) return "Montagem";
-  if (t.includes("retir")) return "Retirada";
-  if (t.includes("manut")) return "Manutenção";
-  if (t.includes("troc")) return "Troca";
-  if (t.includes("revis")) return "Revisão";
-  const cap = t.charAt(0).toUpperCase()+t.slice(1);
-  return VALID_TIPOS.includes(cap) ? cap : cap;
+  // Apenas capitaliza a primeira letra de cada palavra para padronização visual
+  return t.toLowerCase().split(' ').map(word => 
+    word.charAt(0).toUpperCase() + word.slice(1)
+  ).join(' ');
 }
 
 function normalizeRow(raw, sheetName){
@@ -1007,6 +1004,7 @@ function normalizeRow(raw, sheetName){
     month: monthKey(dataISO),
     chamado, cliente, tecnico, tipo, motivo,
     acrescimo: acresc,
+    link: obj["link"] || null,
     _raw: obj
   };
 }
@@ -2149,17 +2147,20 @@ function renderSingleMonthDetailedAnalysis(month) {
       <div class="mt-4 card rounded-xl p-3 bg-white shadowSoft">
         <div class="text-sm font-semibold mb-2">Distribuição por tipo de serviço</div>
         <div class="grid grid-cols-2 md:grid-cols-5 gap-2">
-          ${VALID_TIPOS.map(tipo => {
-            const count = monthRecords.filter(r => r.tipo === tipo).length;
-            const pct = monthRecords.length > 0 ? ((count / monthRecords.length) * 100).toFixed(1) : 0;
-            return `
+            ${(() => {
+            const tiposUnicos = [...new Set(monthRecords.map(r => r.tipo).filter(Boolean))];
+            return tiposUnicos.map(tipo => {
+              const count = monthRecords.filter(r => r.tipo === tipo).length;
+              const pct = monthRecords.length > 0 ? ((count / monthRecords.length) * 100).toFixed(1) : 0;
+              return `
               <div class="card rounded-lg p-2 bg-slate-50 text-center">
-                <div class="text-xs muted">${tipo}</div>
+                <div class="text-xs muted">${escapeHtml(tipo)}</div>
                 <div class="text-lg font-semibold mono">${count}</div>
                 <div class="text-xs muted">${pct}%</div>
               </div>
-            `;
-          }).join('')}
+              `;
+            }).join('');
+            })()}
         </div>
       </div>
     </div>
@@ -2169,8 +2170,8 @@ function renderSingleMonthDetailedAnalysis(month) {
 function renderMultipleMonthsComparison(months) {
   // Dados por mês
   const monthlyData = months.map(month => {
-    const monthRecords = filtered.filter(r => r.month === month && VALID_TIPOS.includes(r.tipo));
-    
+    const monthRecords = filtered.filter(r => r.month === month && r.tipo && r.tipo !== "");
+
     // Contagem por tipo
     const counts = {};
     VALID_TIPOS.forEach(tipo => {
@@ -2221,10 +2222,10 @@ function renderMonthlyKPIs(monthlyData) {
           <span class="muted">Acréscimos:</span>
           <span class="mono font-semibold">${data.acrescimos}</span>
         </div>
-        ${VALID_TIPOS.map(tipo => `
+        ${Object.entries(data.counts).map(([tipo, valor]) => `
           <div class="flex justify-between">
-            <span class="muted">${tipo}:</span>
-            <span class="mono">${data.counts[tipo]}</span>
+            <span class="muted">${escapeHtml(tipo)}:</span>
+            <span class="mono">${valor}</span>
           </div>
         `).join('')}
       </div>
@@ -2333,11 +2334,12 @@ function renderComparisonTableWithTrend(monthlyData) {
   });
   
   // Linhas para cada tipo
-  VALID_TIPOS.forEach(tipo => {
-    const rowData = months.map(month => {
-      const data = monthlyData.find(d => d.month === month);
-      return data ? data.counts[tipo] || 0 : 0;
-    });
+const allTypes = [...new Set(monthlyData.flatMap(d => Object.keys(d.counts)))];
+allTypes.forEach(tipo => {
+  const rowData = months.map(month => {
+    const data = monthlyData.find(d => d.month === month);
+    return data ? data.counts[tipo] || 0 : 0;
+  });
     
     // Calcular variação
     const firstValue = rowData[0];
@@ -2523,7 +2525,7 @@ function renderKPIs(){
 
   const cards = [];
   if (mod === "operacoes"){
-    const mix = groupCount(filtered.filter(r=>VALID_TIPOS.includes(r.tipo)), r=>r.tipo);
+    const mix = groupCount(filtered.filter(r=>r.tipo && r.tipo !== ""), r=>r.tipo);
     const topTipo = topN(mix, 1)[0] ? `${topN(mix,1)[0][0]} (${topN(mix,1)[0][1]})` : "—";
 
     const daySet = new Set(filtered.map(r=>r.data).filter(Boolean));
@@ -2621,7 +2623,7 @@ function renderDominantEquip(){
     return true;
   });
 
-  const mix = groupCount(baseFilteredNoTipo.filter(r=>VALID_TIPOS.includes(r.tipo)), r=>r.tipo);
+  const mix = groupCount(baseFilteredNoTipo.filter(r=>r.tipo && r.tipo !== ""), r=>r.tipo);
   const top = topN(mix, 1)[0];
   if (!top){
     opDominantEquip.classList.add("hidden");
@@ -3040,15 +3042,45 @@ function renderTable(){
     const tr = document.createElement("tr");
     tr.className = "border-t hover:bg-slate-50";
 
+    const linkUrl = (r._raw && r._raw["link"]) ? r._raw["link"] : null;
+    let chamadoHtml = escapeHtml(r.chamado);
+
+    if (linkUrl) {
+      // Detecta se é PDF ou outro arquivo
+      const isPdf = linkUrl.toLowerCase().includes('.pdf');
+      const isImage = linkUrl.toLowerCase().match(/\.(jpg|jpeg|png|gif|webp)$/);
+      
+      let icon = '📎'; // ícone padrão de anexo
+      let tooltip = 'Abrir anexo';
+      
+      if (isPdf) {
+      icon = '📄';
+      tooltip = 'Abrir PDF (pode demorar)';
+      } else if (isImage) {
+      icon = '🖼️';
+      tooltip = 'Abrir imagem';
+      }
+      
+      chamadoHtml = `
+      <a href="${escapeHtml(linkUrl)}" 
+         target="_blank" 
+         class="text-blue-600 underline hover:text-blue-800 flex items-center gap-1" 
+         title="${tooltip}"
+         onclick="return handleLinkClick(event, '${escapeHtml(linkUrl)}')">
+        ${escapeHtml(r.chamado)} <span class="text-xs">${icon}</span>
+      </a>
+      `;
+    }
+
     tr.innerHTML = `
       <td class="p-2">${escapeHtml(r.base)}</td>
       <td class="p-2 mono">${r.data || ""}</td>
-      <td class="p-2 mono">${escapeHtml(r.chamado)}</td>
+      <td class="p-2 mono">${chamadoHtml}</td>
       <td class="p-2">
-        <button class="underline decoration-dotted hover:decoration-solid" data-drill="cliente">${escapeHtml(r.cliente)}</button>
+      <button class="underline decoration-dotted hover:decoration-solid" data-drill="cliente">${escapeHtml(r.cliente)}</button>
       </td>
       <td class="p-2">
-        <button class="underline decoration-dotted hover:decoration-solid" data-drill="tecnico">${escapeHtml(r.tecnico)}</button>
+      <button class="underline decoration-dotted hover:decoration-solid" data-drill="tecnico">${escapeHtml(r.tecnico)}</button>
       </td>
       <td class="p-2">${escapeHtml(r.tipo)}</td>
       <td class="p-2 mono">${r.acrescimo || 0}</td>
@@ -3536,8 +3568,7 @@ function refreshFilterOptions(){
   fillSelect(fCliente, clientes);
   fillSelect(fTecnico, tecnicos);
 
-  const tiposOk = uniqSorted(tipos.filter(t=>VALID_TIPOS.includes(t)));
-  fTipo.innerHTML = `<option value="">(Todos)</option>` + tiposOk.map(t=>`<option value="${escapeHtml(t)}">${escapeHtml(t)}</option>`).join("");
+  fTipo.innerHTML = `<option value="">(Todos)</option>` + tipos.map(t=>`<option value="${escapeHtml(t)}">${escapeHtml(t)}</option>`).join("");
 
   fEquip.innerHTML = `<option value="">(Todos)</option>`;
   for (const col of equipColumns){
@@ -4153,6 +4184,20 @@ document.addEventListener('DOMContentLoaded', function() {
 /* =========================
    INIT charts vazios
 ========================= */
+function handleLinkClick(event, url) {
+  // Se for PDF, tenta abrir normalmente
+  if (url.toLowerCase().includes('.pdf')) {
+    // Deixa o link funcionar normalmente
+    return true;
+  }
+  
+  // Para outros tipos, tenta abrir
+  console.log('Abrindo anexo:', url);
+  return true;
+}
+
+// Expor função globalmente
+window.handleLinkClick = handleLinkClick;
 (function initEmpty(){
   const empty = { type:"bar", data:{labels:[],datasets:[{data:[]}]}, options:{plugins:{legend:{display:false}}} };
   chart1 = new Chart(el("chart1"), {...empty, type:"line"});
